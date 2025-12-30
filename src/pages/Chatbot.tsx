@@ -1,20 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Send, Mic, HelpCircle, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useChatHistory } from '../context/ChatHistoryContext';
 
 export default function Chatbot() {
   const { t } = useLanguage();
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const {
+    currentSession,
+    addMessage,
+    createNewSession
+  } = useChatHistory();
   
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: t('chatbot.welcome'),
-      sender: 'bot',
-      timestamp: '10:30 AM'
-    }
-  ]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Auto-scroll only the chat container to bottom when messages change
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [currentSession?.messages]);
+
+  // Ensure user has a persistent chat session
+  useEffect(() => {
+    if (!currentSession) {
+      // Create a single persistent session for the user
+      createNewSession('My Chat');
+    }
+  }, [currentSession, createNewSession]);
+
+  // Add welcome message if it's the first time or no messages exist
+  useEffect(() => {
+    if (currentSession && currentSession.messages.length === 0) {
+      addMessage(
+        t('chatbot.welcome'),
+        false,
+        { type: 'text' }
+      );
+    }
+  }, [currentSession?.id, addMessage, t]);
 
   const faqItems = [
     t('chatbot.howToReach'),
@@ -26,15 +51,14 @@ export default function Chatbot() {
   ];
 
   const handleSendMessage = async () => {
-    if (newMessage.trim() && !isLoading) {
-      const userMessage = {
-        id: Date.now(),
-        text: newMessage,
-        sender: 'user',
-        timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-      };
+    if (newMessage.trim() && !isLoading && currentSession) {
+      // Add user message to context
+      addMessage(
+        newMessage.trim(),
+        true,
+        { type: 'text' }
+      );
       
-      setMessages(prev => [...prev, userMessage]);
       const currentMessage = newMessage;
       setNewMessage('');
       setIsLoading(true);
@@ -48,8 +72,8 @@ export default function Chatbot() {
           },
           body: JSON.stringify({
             message: currentMessage,
-            conversationHistory: messages.slice(-10).map(msg => ({
-              role: msg.sender === 'user' ? 'user' : 'assistant',
+            conversationHistory: currentSession.messages.slice(-10).map(msg => ({
+              role: msg.isUser ? 'user' : 'assistant',
               content: msg.text
             }))
           })
@@ -62,27 +86,24 @@ export default function Chatbot() {
         const data = await response.json();
         
         if (data.success) {
-          const botResponse = {
-            id: Date.now() + 1,
-            text: data.response,
-            sender: 'bot',
-            timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-            language: data.language,
-            quickActions: data.quickActions || []
-          };
-          setMessages(prev => [...prev, botResponse]);
+          addMessage(
+            data.response,
+            false,
+            {
+              type: 'text',
+              suggestions: data.quickActions || []
+            }
+          );
         } else {
           throw new Error(data.message || 'Failed to get response');
         }
       } catch (error) {
         console.error('❌ Error calling chatbot API:', error);
-        const errorResponse = {
-          id: Date.now() + 1,
-          text: `Sorry, I'm having trouble connecting right now. Please try again later. (Error: ${error instanceof Error ? error.message : 'Unknown error'})`,
-          sender: 'bot',
-          timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-        };
-        setMessages(prev => [...prev, errorResponse]);
+        addMessage(
+          `Sorry, I'm having trouble connecting right now. Please try again later. (Error: ${error instanceof Error ? error.message : 'Unknown error'})`,
+          false,
+          { type: 'error' }
+        );
       } finally {
         setIsLoading(false);
       }
@@ -90,8 +111,59 @@ export default function Chatbot() {
   };
 
   const handleFAQClick = (question: string) => {
-    setNewMessage(question);
-    handleSendMessage();
+    if (!isLoading && currentSession) {
+      // Directly add the FAQ question as a user message
+      addMessage(question, true, { type: 'text' });
+      
+      // Then process it as if it was sent
+      setIsLoading(true);
+      
+      (async () => {
+        try {
+          const response = await fetch('http://localhost:5000/api/chatbot/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: question,
+              conversationHistory: currentSession.messages.slice(-10).map(msg => ({
+                role: msg.isUser ? 'user' : 'assistant',
+                content: msg.text
+              }))
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          if (data.success) {
+            addMessage(
+              data.response,
+              false,
+              {
+                type: 'text',
+                suggestions: data.quickActions || []
+              }
+            );
+          } else {
+            throw new Error(data.message || 'Failed to get response');
+          }
+        } catch (error) {
+          console.error('❌ Error calling chatbot API:', error);
+          addMessage(
+            `Sorry, I'm having trouble connecting right now. Please try again later.`,
+            false,
+            { type: 'error' }
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+    }
   };
 
   return (
@@ -124,30 +196,51 @@ export default function Chatbot() {
             </div>
 
             {/* Messages */}
-            <div className="h-96 overflow-y-auto p-6 space-y-4">
-              {messages.map((message) => (
+            <div 
+              ref={messagesContainerRef}
+              className="h-[500px] overflow-y-auto p-6 space-y-4"
+            >
+              {currentSession?.messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
-                      message.sender === 'user'
+                      message.isUser
                         ? 'bg-green-600 text-white'
+                        : message.metadata?.type === 'error'
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
                     }`}
                   >
                     <p className="text-sm">{message.text}</p>
+                    {message.metadata?.suggestions && message.metadata.suggestions.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {message.metadata.suggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              setNewMessage(suggestion);
+                              handleSendMessage();
+                            }}
+                            className="block w-full text-left px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded transition-colors duration-200"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <p
                       className={`text-xs mt-1 ${
-                        message.sender === 'user' ? 'text-green-200' : 'text-gray-500 dark:text-gray-400'
+                        message.isUser ? 'text-green-200' : 'text-gray-500 dark:text-gray-400'
                       }`}
                     >
-                      {message.timestamp}
+                      {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </p>
                   </div>
                 </div>
-              ))}
+              )) || []}
             </div>
 
             {/* Input */}

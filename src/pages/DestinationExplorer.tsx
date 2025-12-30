@@ -1,76 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Star, Clock, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { destinationsService } from '../lib/database';
+import type { Destination } from '../lib/supabase';
 import { getTranslatedDestinationName, getTranslatedDestinationTagline, getTranslatedDestinationDescription } from '../data/destinationTranslations';
-
-interface Destination {
-  id: number;
-  name: string;
-  tagline: string;
-  image: string;
-  rating: number;
-  bestSeason: string;
-  distance: string;
-  activities: string[];
-  description: string;
-  coordinates: { lat: number; lng: number; };
-}
 
 export default function DestinationExplorer() {
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { t, language } = useLanguage();
 
-  const destinations = [
-    {
-      id: 1,
-      name: 'Netarhat',
-      tagline: 'Queen of Chotanagpur Plateau',
-      image: '/n3.jpg',
-      rating: 4.8,
-      bestSeason: 'October - March',
-      distance: '156 km from Ranchi',
-      activities: ['Sunrise Views', 'Pine Forest Walk', 'Photography'],
-      description: 'Famous for its sunrise views and cool climate, Netarhat is a perfect hill station escape.',
-      coordinates: { lat: 23.4676, lng: 84.2534 }
-    },
-    {
-      id: 2,
-      name: 'Hundru Falls',
-      tagline: 'Thundering Beauty',
-      image: '/h1.jpg',
-      rating: 4.6,
-      bestSeason: 'July - January',
-      distance: '45 km from Ranchi',
-      activities: ['Waterfall Photography', 'Trekking', 'Rock Climbing'],
-      description: 'A spectacular 98-meter waterfall where Subarnarekha river creates nature\'s masterpiece.',
-      coordinates: { lat: 23.4333, lng: 85.6167 }
-    },
-    {
-      id: 3,
-      name: 'Betla National Park',
-      tagline: 'Wildlife Paradise',
-      image: '/b2.jpg',
-      rating: 4.7,
-      bestSeason: 'November - April',
-      distance: '170 km from Ranchi',
-      activities: ['Safari', 'Bird Watching', 'Nature Photography'],
-      description: 'Home to tigers, elephants and diverse wildlife in the Palamau Tiger Reserve.',
-      coordinates: { lat: 23.9167, lng: 84.1833 }
-    },
-    {
-      id: 4,
-      name: 'Deoghar',
-      tagline: 'Abode of Gods',
-      image: '/deo2.jpg',
-      rating: 4.5,
-      bestSeason: 'October - March',
-      distance: '250 km from Ranchi',
-      activities: ['Temple Visits', 'Spiritual Walk', 'Cultural Tours'],
-      description: 'Sacred temple town famous for Baba Baidyanath Dham, one of the twelve Jyotirlingas.',
-      coordinates: { lat: 24.4833, lng: 86.7 }
-    }
-  ];
+  // Fetch destinations from Supabase
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        setLoading(true);
+        const data = await destinationsService.getAll();
+        setDestinations(data);
+      } catch (err) {
+        console.error('Error fetching destinations:', err);
+        setError('Failed to load destinations');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDestinations();
+  }, []);
 
   return (
     <div className="pt-20 min-h-screen bg-stone-50 dark:bg-black transition-colors duration-300">
@@ -82,7 +41,27 @@ export default function DestinationExplorer() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {loading && (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading destinations...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-12">
+            <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && destinations.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left - Interactive Map */}
           <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-lg dark:shadow-black/50 border border-gray-100 dark:border-gray-800 hover:shadow-xl transition-all duration-500 animate-fadeInUp">
             <div className="flex items-center justify-between mb-4">
@@ -159,7 +138,7 @@ export default function DestinationExplorer() {
                       </div>
                       <div className="flex items-center space-x-1">
                         <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{destination.rating}</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">4.8</span>
                       </div>
                     </div>
                     
@@ -168,18 +147,18 @@ export default function DestinationExplorer() {
                     <div className="flex flex-wrap gap-2">
                       <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
                         <Clock className="w-3 h-3" />
-                        <span>{destination.bestSeason}</span>
+                        <span>{destination.best_season}</span>
                       </div>
                       <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
                         <MapPin className="w-3 h-3" />
-                        <span>{destination.distance}</span>
+                        <span>{destination.location}</span>
                       </div>
                     </div>
                     
                     <div className="flex justify-between items-center pt-2">
                       <div className="flex space-x-1">
-                        {destination.activities.slice(0, 2).map((activity) => (
-                          <span key={activity} className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium">
+                        {destination.highlights.slice(0, 2).map((activity, index) => (
+                          <span key={index} className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium">
                             {activity}
                           </span>
                         ))}
@@ -195,6 +174,7 @@ export default function DestinationExplorer() {
             ))}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MapPin, Clock, Users, Download, Sparkles, Plus, X } from 'lucide-react';
+import { MapPin, Clock, Users, Download, Sparkles, Plus, X, Save, History, Trash2, Edit3 } from 'lucide-react';
 import { useItinerary } from '../context/ItineraryContext';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function ItineraryPlanner() {
   const { t } = useLanguage();
   const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'planner' | 'history'>('planner');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [generatedItinerary, setGeneratedItinerary] = useState<any>(null);
@@ -19,7 +20,20 @@ export default function ItineraryPlanner() {
     desiredPlaces: [] as string[]
   });
   const [newPlace, setNewPlace] = useState('');
-  const { desiredPlaces, addDesiredPlace, removeDesiredPlace } = useItinerary();
+  
+  // Get all context methods and data
+  const { 
+    currentItinerary, 
+    savedItineraries, 
+    addDesiredPlace, 
+    removeDesiredPlace, 
+    updateItineraryDetails,
+    setItineraryTitle,
+    saveCurrentItinerary,
+    loadItinerary,
+    deleteItinerary,
+    clearCurrentItinerary
+  } = useItinerary();
 
   // Auto-populate from QuickSearchBar data
   useEffect(() => {
@@ -31,23 +45,29 @@ export default function ItineraryPlanner() {
         groupType: tripType || '',
       }));
       
+      // Update context with form details
+      updateItineraryDetails({
+        duration: duration || '',
+        preferences: tripType ? [tripType] : []
+      });
+      
       // If we have data from quick search, scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [location.state]);
+  }, [location.state, updateItineraryDetails]);
 
   // Debug logging
   console.log('ItineraryPlanner: Component rendered');
-  console.log('ItineraryPlanner: Current desiredPlaces from context:', desiredPlaces);
+  console.log('ItineraryPlanner: Current itinerary from context:', currentItinerary);
 
   // Sync local form data with global context
   useEffect(() => {
     console.log('ItineraryPlanner: Syncing form data with context');
     setFormData(prev => ({
       ...prev,
-      desiredPlaces: desiredPlaces
+      desiredPlaces: currentItinerary.desiredPlaces
     }));
-  }, [desiredPlaces]);
+  }, [currentItinerary.desiredPlaces]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +116,7 @@ export default function ItineraryPlanner() {
   };
 
   const addPlace = () => {
-    if (newPlace.trim() && !desiredPlaces.includes(newPlace.trim())) {
+    if (newPlace.trim() && !currentItinerary.desiredPlaces.includes(newPlace.trim())) {
       addDesiredPlace(newPlace.trim());
       setNewPlace('');
     }
@@ -167,7 +187,40 @@ export default function ItineraryPlanner() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Tab Navigation */}
+        <div className="mb-8">
+          <div className="flex justify-center">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-2 shadow-xl border border-gray-100 dark:border-gray-800 backdrop-blur-sm">
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setActiveTab('planner')}
+                  className={`px-8 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 ${
+                    activeTab === 'planner'
+                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-600/25'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <Sparkles className="w-5 h-5" />
+                  <span>Plan New Trip</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('history')}
+                  className={`px-8 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 ${
+                    activeTab === 'history'
+                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-600/25'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <History className="w-5 h-5" />
+                  <span>Previous Trips ({savedItineraries.length})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {activeTab === 'planner' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Panel - Form */}
           <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-lg dark:shadow-black/50 border border-gray-100 dark:border-gray-800 hover:shadow-xl transition-all duration-500 animate-fadeInUp">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center space-x-2">
@@ -271,9 +324,9 @@ export default function ItineraryPlanner() {
                     <Plus className="w-5 h-5" />
                   </button>
                 </div>
-                {desiredPlaces.length > 0 && (
+                {currentItinerary.desiredPlaces.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                    {desiredPlaces.map((place, index) => (
+                    {currentItinerary.desiredPlaces.map((place, index) => (
                       <span key={index} className="flex items-center bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-sm font-medium px-2.5 py-0.5 rounded-full">
                         {place}
                         <button
@@ -323,6 +376,56 @@ export default function ItineraryPlanner() {
                   </>
                 )}
               </button>
+
+              {/* Save Current Work Button */}
+              {(currentItinerary.desiredPlaces.length > 0 || formData.startCity || formData.dates) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const title = prompt('Enter a title for this itinerary:', currentItinerary.title || `Trip to ${formData.startCity || 'Multiple Destinations'} - ${new Date().toLocaleDateString()}`);
+                    if (title) {
+                      // Update context with current form data before saving
+                      updateItineraryDetails({
+                        duration: formData.duration,
+                        preferences: formData.interests
+                      });
+                      setItineraryTitle(title);
+                      saveCurrentItinerary();
+                      alert('Itinerary saved successfully! You can find it in the "Previous Trips" tab.');
+                    }
+                  }}
+                  className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-xl font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg flex items-center justify-center space-x-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Current Work</span>
+                </button>
+              )}
+
+              {/* Clear Work Button */}
+              {(currentItinerary.desiredPlaces.length > 0 || formData.startCity || formData.dates) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Are you sure you want to clear all current work? This cannot be undone.')) {
+                      clearCurrentItinerary();
+                      setFormData({
+                        startCity: '',
+                        dates: '',
+                        duration: '',
+                        interests: [],
+                        groupType: '',
+                        desiredPlaces: []
+                      });
+                      setShowResults(false);
+                      setGeneratedItinerary(null);
+                    }
+                  }}
+                  className="w-full mt-2 bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Clear Work</span>
+                </button>
+              )}
             </form>
           </div>
 
@@ -439,6 +542,108 @@ export default function ItineraryPlanner() {
             )}
           </div>
         </div>
+        ) : (
+          /* History Tab Content */
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-lg dark:shadow-black/50 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center space-x-2">
+                  <History className="w-6 h-6 text-green-600" />
+                  <span>Previous Itineraries</span>
+                </h2>
+                {currentItinerary.title && (
+                  <button
+                    onClick={() => {
+                      const title = prompt('Enter itinerary title:', currentItinerary.title || `Trip ${new Date().toLocaleDateString()}`);
+                      if (title) {
+                        setItineraryTitle(title);
+                        saveCurrentItinerary();
+                        alert('Current itinerary saved!');
+                      }
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl flex items-center space-x-2 transition-colors duration-300"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Current Trip</span>
+                  </button>
+                )}
+              </div>
+
+              {savedItineraries.length === 0 ? (
+                <div className="text-center py-12">
+                  <History className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No saved itineraries yet</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">Start planning your first trip to see it here!</p>
+                  <button
+                    onClick={() => setActiveTab('planner')}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-300"
+                  >
+                    Plan Your First Trip
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {savedItineraries.map((itinerary) => (
+                    <div key={itinerary.id} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{itinerary.title}</h3>
+                          <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                            <span className="flex items-center space-x-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>{itinerary.destinations.length} destinations</span>
+                            </span>
+                            <span className="flex items-center space-x-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{new Date(itinerary.createdAt).toLocaleDateString()}</span>
+                            </span>
+                          </div>
+                          {itinerary.destinations.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {itinerary.destinations.slice(0, 3).map((dest, index) => (
+                                <span key={index} className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-lg text-xs">
+                                  {dest}
+                                </span>
+                              ))}
+                              {itinerary.destinations.length > 3 && (
+                                <span className="text-gray-500 dark:text-gray-400 text-xs px-2 py-1">
+                                  +{itinerary.destinations.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2 ml-4">
+                          <button
+                            onClick={() => {
+                              loadItinerary(itinerary.id);
+                              setActiveTab('planner');
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors duration-300"
+                            title="Load this itinerary"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this itinerary?')) {
+                                deleteItinerary(itinerary.id);
+                              }
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors duration-300"
+                            title="Delete this itinerary"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

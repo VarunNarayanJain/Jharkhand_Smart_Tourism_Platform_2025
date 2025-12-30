@@ -1,60 +1,76 @@
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { getTranslatedDestinationName, getTranslatedDestinationTagline, getTranslatedDestinationDescription } from '../data/destinationTranslations';
+import { destinationsService } from '../lib/database';
+import type { Destination } from '../lib/supabase';
 
 export default function FeaturedDestinations() {
   const { t, language } = useLanguage();
   const scrollContainer = useRef<HTMLDivElement>(null);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const destinations = [
-    {
-      id: 1,
-      name: 'Netarhat',
-      tagline: 'Queen of Chotanagpur Plateau',
-      story: 'Famous for sunrise views and pine forests that create a magical morning mist',
-      image: '/n1.jpg',
-      bestSeason: 'Oct-Mar',
-      distance: '156 km from Ranchi'
-    },
-    {
-      id: 2,
-      name: 'Hundru Falls',
-      tagline: 'Thundering Beauty',
-      story: 'Where Subarnarekha river creates a spectacular 98-meter waterfall',
-      image: 'h1.jpg',
-      bestSeason: 'Jul-Jan',
-      distance: '45 km from Ranchi'
-    },
-    {
-      id: 3,
-      name: 'Betla National Park',
-      tagline: 'Wildlife Paradise',
-      story: 'Home to tigers, elephants and rich biodiversity in the Palamau region',
-      image: 'b1.jpg',
-      bestSeason: 'Nov-Apr',
-      distance: '170 km from Ranchi'
-    },
-    {
-      id: 4,
-      name: 'Deoghar',
-      tagline: 'Abode of Gods',
-      story: 'Sacred temple town famous for Baba Baidyanath Dham and spiritual energy',
-      image: 'deo1.jpeg',
-      bestSeason: 'Oct-Mar',
-      distance: '250 km from Ranchi'
-    },
-    {
-      id: 5,
-      name: 'Hazaribagh',
-      tagline: 'Land of Thousand Gardens',
-      story: 'Rolling hills, wildlife sanctuary and serene lakes create perfect retreat',
-      image: 'haz1.jpg',
-      bestSeason: 'Sep-Mar',
-      distance: '91 km from Ranchi'
-    }
-  ];
+  // Fetch destinations from Supabase
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        setLoading(true);
+        const data = await destinationsService.getFeatured();
+        setDestinations(data);
+      } catch (err) {
+        console.error('Error fetching destinations:', err);
+        setError('Failed to load destinations');
+        // Fallback to hardcoded data if Supabase fails
+        setDestinations([
+          {
+            id: 1,
+            name: 'Netarhat',
+            tagline: 'Queen of Chotanagpur Plateau',
+            story: 'Famous for sunrise views and pine forests that create a magical morning mist',
+            image: '/n1.jpg',
+            best_season: 'Oct-Mar',
+            distance: '156 km from Ranchi',
+            location: 'Netarhat, Jharkhand',
+            activities: ['Sunrise Viewing', 'Pine Forest Walks'],
+            highlights: ['Stunning sunrise views', 'Pine forests'],
+            weather: {
+              temperature: 25,
+              humidity: 60,
+              windSpeed: 10
+            },
+            created_at: '',
+            updated_at: ''
+          },
+          {
+            id: 2,
+            name: 'Hundru Falls',
+            tagline: 'Thundering Beauty',
+            story: 'Where Subarnarekha river creates a spectacular 98-meter waterfall',
+            image: '/h1.jpg',
+            best_season: 'Jul-Jan',
+            distance: '45 km from Ranchi',
+            location: 'Ranchi, Jharkhand',
+            activities: ['Waterfall Photography', 'Trekking'],
+            highlights: ['98-meter high waterfall', 'Subarnarekha river'],
+            weather: {
+              temperature: 28,
+              humidity: 70,
+              windSpeed: 12
+            },
+            created_at: '',
+            updated_at: ''
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDestinations();
+  }, []);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainer.current) {
@@ -62,6 +78,48 @@ export default function FeaturedDestinations() {
       scrollContainer.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-green-50 dark:bg-gray-900 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-300">Loading destinations...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Error state with fallback data
+  if (error || destinations.length === 0) {
+    console.log('Using fallback data due to:', error);
+    return (
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-green-50 dark:bg-gray-900 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Featured Destinations</h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+              Explore the most breathtaking destinations Jharkhand has to offer
+            </p>
+            {error && <p className="text-red-500 mt-2">Note: Using offline data - {error}</p>}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Netarhat</h3>
+              <p className="text-gray-600 dark:text-gray-300">Queen of Chotanagpur Plateau</p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Hundru Falls</h3>
+              <p className="text-gray-600 dark:text-gray-300">Thundering Beauty</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-20 px-4 sm:px-6 lg:px-8 bg-green-50 dark:bg-gray-900 transition-colors duration-300">
@@ -122,7 +180,7 @@ export default function FeaturedDestinations() {
                   <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 mb-4">
                     <div className="flex items-center space-x-1">
                       <Clock className="w-3 h-3" />
-                      <span>{destination.bestSeason}</span>
+                      <span>{destination.best_season}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <MapPin className="w-3 h-3" />

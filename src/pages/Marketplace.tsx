@@ -1,99 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShoppingBag, Star, Heart, MapPin, Shield } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { marketplaceService } from '../lib/database';
+import type { MarketplaceItem } from '../lib/supabase';
 
 export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [items, setItems] = useState<MarketplaceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { t } = useLanguage();
 
-  const categories = [
-    { id: 'all', name: t('marketplace.all'), count: 28 },
-    { id: 'handicrafts', name: t('marketplace.handicrafts'), count: 12 },
-    { id: 'textiles', name: t('marketplace.textiles'), count: 8 },
-    { id: 'jewelry', name: t('marketplace.jewelry'), count: 6 },
-    { id: 'pottery', name: t('marketplace.pottery'), count: 4 },
-    { id: 'food', name: t('marketplace.food'), count: 2 }
-  ];
+  // Fetch marketplace items from Supabase
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setLoading(true);
+        const data = await marketplaceService.getAll();
+        setItems(data);
+      } catch (err) {
+        console.error('Error fetching marketplace items:', err);
+        setError('Failed to load marketplace items');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const items = [
-    {
-      id: 1,
-      title: 'Handwoven Bamboo Baskets',
-      artisan: 'Mina Devi',
-      location: 'Khunti Village',
-      price: '₹850',
-      image: 'https://images.pexels.com/photos/4207892/pexels-photo-4207892.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=1',
-      story: 'Traditional baskets made using ancient weaving techniques passed down through generations',
-      rating: 4.8,
-      category: 'handicrafts',
-      verified: true,
-      badge: 'Community Endorsed'
-    },
-    {
-      id: 2,
-      title: 'Authentic Tribal Homestay',
-      artisan: 'Rajesh Oraon',
-      location: 'Netarhat Hills',
-      price: '₹1,200/night',
-      image: 'https://images.pexels.com/photos/1029599/pexels-photo-1029599.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=1',
-      story: 'Experience traditional tribal lifestyle with organic meals and cultural activities',
-      rating: 4.9,
-      category: 'homestays',
-      verified: true,
-      badge: 'Verified'
-    },
-    {
-      id: 3,
-      title: 'Certified Nature Guide',
-      artisan: 'Amit Kumar Singh',
-      location: 'Betla National Park',
-      price: '₹2,500/day',
-      image: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=1',
-      story: '15+ years experience in wildlife tracking and tribal culture storytelling',
-      rating: 4.7,
-      category: 'guides',
-      verified: true,
-      badge: 'Expert Guide'
-    },
-    {
-      id: 4,
-      title: 'Santhal Tribal Art Paintings',
-      artisan: 'Geeta Murmu',
-      location: 'Dumka District',
-      price: '₹1,500',
-      image: 'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=1',
-      story: 'Vibrant paintings depicting Santhal folklore and nature-based stories',
-      rating: 4.6,
-      category: 'handicrafts',
-      verified: true,
-      badge: 'Authentic'
-    },
-    {
-      id: 5,
-      title: 'Karma Festival Experience',
-      artisan: 'Cultural Heritage Society',
-      location: 'Multiple Locations',
-      price: 'Free',
-      image: 'https://images.pexels.com/photos/1190298/pexels-photo-1190298.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=1',
-      story: 'Join the traditional harvest festival with music, dance and community celebration',
-      rating: 4.9,
-      category: 'events',
-      verified: true,
-      badge: 'Cultural Event'
-    },
-    {
-      id: 6,
-      title: 'Dokra Metal Crafts',
-      artisan: 'Ramesh Mahato',
-      location: 'Saraikela',
-      price: '₹3,200',
-      image: 'https://images.pexels.com/photos/6128070/pexels-photo-6128070.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=1',
-      story: 'Ancient lost-wax casting technique creating beautiful brass figurines and decorative items',
-      rating: 4.8,
-      category: 'handicrafts',
-      verified: true,
-      badge: 'Master Craftsman'
-    }
+    fetchItems();
+  }, []);
+
+  const categories = [
+    { id: 'all', name: t('marketplace.all'), count: items.length },
+    { id: 'handicrafts', name: t('marketplace.handicrafts'), count: items.filter(item => item.category === 'handicrafts').length },
+    { id: 'textiles', name: t('marketplace.textiles'), count: items.filter(item => item.category === 'textiles').length },
+    { id: 'jewelry', name: t('marketplace.jewelry'), count: items.filter(item => item.category === 'jewelry').length },
+    { id: 'pottery', name: t('marketplace.pottery'), count: items.filter(item => item.category === 'pottery').length },
+    { id: 'food', name: t('marketplace.food'), count: items.filter(item => item.category === 'food').length }
   ];
 
   const filteredItems = selectedCategory === 'all' 
@@ -110,22 +52,43 @@ export default function Marketplace() {
           </p>
         </div>
 
-        {/* Category Filter */}
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`px-6 py-3 rounded-full font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg ${
-                selectedCategory === category.id
-                  ? 'bg-green-600 text-white shadow-lg'
-                  : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-500 hover:text-green-600 dark:hover:text-green-400'
-              }`}
+        {loading && (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading marketplace items...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-12">
+            <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200"
             >
-              {category.name} ({category.count})
+              Try Again
             </button>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <>
+            {/* Category Filter */}
+            <div className="flex flex-wrap justify-center gap-4 mb-12">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`px-6 py-3 rounded-full font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                    selectedCategory === category.id
+                      ? 'bg-green-600 text-white shadow-lg'
+                      : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-white border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-500 hover:text-green-600 dark:hover:text-green-400'
+                  }`}
+                >
+                  {category.name} ({category.count})
+                </button>
+              ))}
+            </div>
 
         {/* Items Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -163,7 +126,7 @@ export default function Marketplace() {
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors duration-300">
                       {item.title}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">by {item.artisan}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">by {item.artisan_name}</p>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Star className="w-4 h-4 text-yellow-400 fill-current" />
@@ -177,7 +140,7 @@ export default function Marketplace() {
 
                 <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-4">
                   <MapPin className="w-3 h-3" />
-                  <span>{item.location}</span>
+                  <span>{item.artisan_location}</span>
                   {item.verified && (
                     <>
                       <Shield className="w-3 h-3 text-green-600" />
@@ -199,6 +162,8 @@ export default function Marketplace() {
             </div>
           ))}
         </div>
+        </>
+        )}
       </div>
     </div>
   );

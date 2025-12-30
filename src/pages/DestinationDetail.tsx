@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   MapPin, 
   Clock, 
   Star, 
   Camera,
-
   Heart,
   Share2,
   Navigation,
@@ -21,7 +20,8 @@ import {
   XCircle,
   Clock as ClockIcon
 } from 'lucide-react';
-import { getDestinationById } from '../data/destinations';
+import { destinationsService, reviewsService, guidesService, restaurantsService, marketplaceService } from '../lib/database';
+import type { Destination, Review, Guide, Restaurant, MarketplaceItem } from '../lib/supabase';
 import { useItinerary } from '../context/ItineraryContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -29,15 +29,79 @@ export default function DestinationDetail() {
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('overview');
   const [isLiked, setIsLiked] = useState(false);
-  const { addDesiredPlace, desiredPlaces } = useItinerary();
+  const { addDesiredPlace, currentItinerary } = useItinerary();
   const [showNotification, setShowNotification] = useState(false);
   const { t } = useLanguage();
+  const [destination, setDestination] = useState<Destination | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get destination data based on ID
-  const destination = getDestinationById(Number(id));
+  // Fetch destination data based on ID
+  useEffect(() => {
+    if (!id) return;
+    
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const destinationId = parseInt(id);
+        
+        console.log('🔍 Fetching data for destination ID:', destinationId);
+        
+        // Fetch destination details
+        const destinationData = await destinationsService.getById(destinationId);
+        console.log('📍 Destination data:', destinationData);
+        setDestination(destinationData);
+        
+        if (destinationData) {
+          // Fetch related data
+          const [reviewsData, guidesData, restaurantsData, marketplaceData] = await Promise.all([
+            reviewsService.getByDestination(destinationId),
+            guidesService.getAll(), // Get all guides for now, could filter by location
+            restaurantsService.getByDestination(destinationId),
+            marketplaceService.getAll() // Get all marketplace items
+          ]);
+          
+          console.log('📝 Reviews data:', reviewsData);
+          console.log('👨‍🏫 Guides data:', guidesData);
+          console.log('🍽️ Restaurants data:', restaurantsData);
+          console.log('🛍️ Marketplace data:', marketplaceData);
+          
+          setReviews(reviewsData);
+          setGuides(guidesData);
+          setRestaurants(restaurantsData);
+          setMarketplaceItems(marketplaceData);
+          
+          // Debug logging
+          console.log('Fetched data:', {
+            destination: destinationData,
+            reviews: reviewsData,
+            restaurants: restaurantsData,
+            guides: guidesData,
+            marketplace: marketplaceData
+          });
+        }
+      } catch (err) {
+        console.error('❌ Error fetching destination data:', err);
+        setError('Failed to load destination details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [id]);
+
+  // Calculate average rating from reviews
+  const averageRating = reviews.length > 0 
+    ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+    : '0.0';
 
   // Check if this destination is already in the itinerary
-  const isInItinerary = destination ? desiredPlaces.includes(destination.name) : false;
+  const isInItinerary = destination ? currentItinerary.desiredPlaces.includes(destination.name) : false;
 
   const handleAddToItinerary = () => {
     if (destination) {
@@ -47,19 +111,30 @@ export default function DestinationDetail() {
     }
   };
 
-  // Handle case when destination is not found
-  if (!destination) {
+  // Handle case when destination is not found or loading
+  if (loading) {
+    return (
+      <div className="pt-20 min-h-screen bg-stone-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading destination details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !destination) {
     return (
       <div className="pt-20 min-h-screen bg-stone-50 dark:bg-black flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t('destDetail.notFound')}</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">{t('destDetail.notFoundDesc')}</p>
-                     <Link
-             to="/"
-             className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200"
-           >
-             {t('destDetail.backHome')}
-           </Link>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">{error || t('destDetail.notFoundDesc')}</p>
+          <Link
+            to="/"
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200"
+          >
+            {t('destDetail.backHome')}
+          </Link>
         </div>
       </div>
     );
@@ -88,7 +163,7 @@ export default function DestinationDetail() {
       {/* Hero Section */}
       <div className="relative h-96 overflow-hidden">
         <img
-          src={destination.images[0]}
+          src={destination.image}
           alt={destination.name}
           className="w-full h-full object-cover"
         />
@@ -163,7 +238,7 @@ export default function DestinationDetail() {
              </div>
              <div className="flex items-center space-x-2">
                <Clock className="w-4 h-4" />
-               <span>{t('destDetail.bestTime')}: {destination.bestTime}</span>
+               <span>{t('destDetail.bestTime')}: {destination.best_season}</span>
              </div>
            </div>
          </div>
@@ -179,18 +254,18 @@ export default function DestinationDetail() {
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900 dark:text-white">{destination.weather.temperature}°C</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">{destination.weather.condition}</div>
+              <div className="text-3xl font-bold text-gray-900 dark:text-white">{destination.weather?.temperature || 25}°C</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Pleasant</div>
             </div>
             <div className="text-center">
               <Droplets className="w-6 h-6 text-blue-500 mx-auto mb-1" />
               <div className="text-sm text-gray-600 dark:text-gray-300">{t('destDetail.humidity')}</div>
-              <div className="font-semibold text-gray-900 dark:text-white">{destination.weather.humidity}%</div>
+              <div className="font-semibold text-gray-900 dark:text-white">{destination.weather?.humidity || 60}%</div>
             </div>
             <div className="text-center">
               <Wind className="w-6 h-6 text-gray-500 dark:text-gray-400 mx-auto mb-1" />
               <div className="text-sm text-gray-600 dark:text-gray-300">{t('destDetail.windSpeed')}</div>
-              <div className="font-semibold text-gray-900 dark:text-white">{destination.weather.windSpeed} km/h</div>
+              <div className="font-semibold text-gray-900 dark:text-white">{destination.weather?.windSpeed || 10} km/h</div>
             </div>
             <div className="text-center">
               <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
@@ -221,12 +296,17 @@ export default function DestinationDetail() {
           </div>
 
           <div className="p-6">
+            {/* Debug info */}
+            <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-800 rounded text-sm">
+              <strong>Debug Info:</strong> Active tab = {activeTab} | Reviews: {reviews.length} | Restaurants: {restaurants.length} | Guides: {guides.length} | Marketplace: {marketplaceItems.length}
+            </div>
+            
             {/* Overview Tab */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
                 <div className="animate-fadeInUp">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t('destDetail.about')} {destination.name}</h3>
-                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{destination.description}</p>
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{destination.story}</p>
                 </div>
 
                 {/* Map Section */}
@@ -235,13 +315,13 @@ export default function DestinationDetail() {
                     <Navigation className="w-5 h-5 text-green-600" />
                     <span>{t('marketplace.location')}</span>
                   </h4>
-                  <div 
+                  <div
                     className="bg-gray-100 dark:bg-gray-800 rounded-xl h-64 overflow-hidden cursor-pointer hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 relative group"
-                    onClick={() => window.open(`https://www.google.com/maps/@${destination.coordinates.lat},${destination.coordinates.lng},15z`, '_blank')}
+                    onClick={() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(destination.name + ' ' + destination.location)}`, '_blank')}
                   >
                     {/* Embedded Google Maps */}
                     <iframe
-                      src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3648.123456789012!2d${destination.coordinates.lng}!3d${destination.coordinates.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zM!5e0!3m2!1sen!2sin!4v1609459200000!5m2!1sen!2sin`}
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(destination.name + ' ' + destination.location)}&output=embed`}
                       width="100%"
                       height="100%"
                       style={{ border: 0 }}
@@ -264,10 +344,10 @@ export default function DestinationDetail() {
                   <div className="mt-4 flex items-center justify-between bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/50">
                     <div>
                       <p className="text-sm text-gray-600 dark:text-gray-300">Coordinates</p>
-                      <p className="font-mono text-sm text-gray-800 dark:text-white">{destination.coordinates.lat}, {destination.coordinates.lng}</p>
+                      <p className="font-mono text-sm text-gray-800 dark:text-white">{destination.location}</p>
                     </div>
                     <button
-                      onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${destination.coordinates.lat},${destination.coordinates.lng}`, '_blank')}
+                      onClick={() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(destination.name + ' ' + destination.location)}`, '_blank')}
                       className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg flex items-center space-x-2"
                     >
                       <Navigation className="w-4 h-4" />
@@ -282,7 +362,7 @@ export default function DestinationDetail() {
             {activeTab === 'photos' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {destination.images.map((image, index) => (
+                  {[destination.image].map((image, index) => (
                     <div key={index} className="relative group cursor-pointer">
                       <img
                         src={image}
@@ -321,40 +401,47 @@ export default function DestinationDetail() {
                         <Star key={star} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                       ))}
                     </div>
-                    <span className="text-lg font-semibold text-gray-900 dark:text-white">4.7</span>
-                    <span className="text-gray-600 dark:text-gray-400">({destination.reviews.length} {destination.reviews.length === 1 ? t('destDetail.review') : t('destDetail.reviews_plural')})</span>
+                    <span className="text-lg font-semibold text-gray-900 dark:text-white">{averageRating}</span>
+                    <span className="text-gray-600 dark:text-gray-400">({reviews.length} {reviews.length === 1 ? t('destDetail.review') : t('destDetail.reviews_plural')})</span>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  {destination.reviews.map((review) => (
-                    <div key={review.id} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 hover:shadow-md transition-all duration-300">
-                      <div className="flex items-start space-x-4">
-                        <img
-                          src={review.avatar}
-                          alt={review.user}
-                          className="w-12 h-12 rounded-full"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold text-gray-900 dark:text-white">{review.user}</h4>
-                            <div className="flex items-center space-x-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                  key={star}
-                                  className={`w-4 h-4 ${
-                                    star <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-                                  }`}
-                                />
-                              ))}
+                  {reviews.length > 0 ? (
+                    reviews.map((review) => (
+                      <div key={review.id} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 hover:shadow-md transition-all duration-300">
+                        <div className="flex items-start space-x-4">
+                          <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold">
+                            {review.id}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-gray-900 dark:text-white">Anonymous User</h4>
+                              <div className="flex items-center space-x-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`w-4 h-4 ${
+                                      star <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-gray-700 dark:text-white mb-2">{review.comment}</p>
+                            <div className="flex items-center justify-between text-sm text-gray-500">
+                              <span>{new Date(review.created_at || '').toLocaleDateString()}</span>
+                              <span>{review.helpful_count} people found this helpful</span>
                             </div>
                           </div>
-                          <p className="text-gray-700 dark:text-white mb-2">{review.comment}</p>
-                          <p className="text-sm text-gray-500">{review.date}</p>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 dark:text-gray-400">No reviews available yet</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
@@ -368,7 +455,7 @@ export default function DestinationDetail() {
                  </div>
                  
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                   {destination.localGuides.map((guide) => (
+                   {guides.map((guide: any) => (
                      <div key={guide.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105">
                        <div className="p-6">
                          <div className="flex items-start space-x-4 mb-4">
@@ -417,7 +504,7 @@ export default function DestinationDetail() {
                            <div>
                              <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{t('destDetail.languages')}</p>
                              <div className="flex flex-wrap gap-1">
-                               {guide.languages.map((language, idx) => (
+                               {guide.languages?.map((language: any, idx: number) => (
                                  <span
                                    key={idx}
                                    className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-full"
@@ -431,7 +518,7 @@ export default function DestinationDetail() {
                            <div>
                              <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{t('destDetail.specialties')}</p>
                              <div className="flex flex-wrap gap-1">
-                               {guide.specialties.map((specialty, idx) => (
+                               {guide.specialties?.map((specialty: any, idx: number) => (
                                  <span
                                    key={idx}
                                    className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-full"
@@ -468,47 +555,56 @@ export default function DestinationDetail() {
             {activeTab === 'eateries' && (
               <div className="space-y-6">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{t('destDetail.eateries')}</h3>
+                <div className="mb-4 text-sm text-gray-600">
+                  Debug: Found {restaurants.length} restaurants for destination {id}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {destination.localEateries.map((eatery, index) => (
-                    <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105">
-                      <img
-                        src={eatery.image}
-                        alt={eatery.name}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="p-4">
-                        <h4 className="font-bold text-gray-900 dark:text-white mb-2">{eatery.name}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{eatery.cuisine}</p>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`w-4 h-4 ${
-                                  star <= eatery.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 dark:text-gray-600'
-                                }`}
-                              />
-                            ))}
-                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{eatery.rating}</span>
+                  {restaurants.length > 0 ? (
+                    restaurants.map((eatery: any, index: number) => (
+                      <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105">
+                        <img
+                          src={eatery.image}
+                          alt={eatery.name}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="p-4">
+                          <h4 className="font-bold text-gray-900 dark:text-white mb-2">{eatery.name}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{eatery.cuisine}</p>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-4 h-4 ${
+                                    star <= eatery.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 dark:text-gray-600'
+                                  }`}
+                                />
+                              ))}
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">{eatery.rating}</span>
+                            </div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">{eatery.price_range}</span>
                           </div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{eatery.priceRange}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{t('destDetail.specialties')}</p>
-                          <div className="flex flex-wrap gap-1">
-                            {eatery.specialties.map((specialty, idx) => (
-                              <span
-                                key={idx}
-                                className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-full"
-                              >
-                                {specialty}
-                              </span>
-                            ))}
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{t('destDetail.specialties')}</p>
+                            <div className="flex flex-wrap gap-1">
+                              {eatery.specialties?.map((specialty: any, idx: number) => (
+                                <span
+                                  key={idx}
+                                  className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-full"
+                                >
+                                  {specialty}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 dark:text-gray-400">No local eateries available yet</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
@@ -518,25 +614,60 @@ export default function DestinationDetail() {
               <div className="space-y-6">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{t('destDetail.transport')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {destination.transportation.map((transport, index) => (
-                    <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <transport.icon className="w-8 h-8 text-green-600 dark:text-green-400" />
-                        <h4 className="font-bold text-gray-900 dark:text-white">{transport.mode}</h4>
+                  {/* Sample transportation options */}
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <Navigation className="w-8 h-8 text-green-600 dark:text-green-400" />
+                      <h4 className="font-bold text-gray-900 dark:text-white">By Road</h4>
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 mb-3">Well-connected by state highways and national roads</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">{t('destDetail.duration')}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{destination.distance}</span>
                       </div>
-                      <p className="text-gray-700 dark:text-gray-300 mb-3">{transport.details}</p>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">{t('destDetail.duration')}</span>
-                          <span className="font-semibold text-gray-900 dark:text-white">{transport.duration}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">{t('destDetail.cost')}</span>
-                          <span className="font-semibold text-gray-900 dark:text-white">{transport.cost}</span>
-                        </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">{t('destDetail.cost')}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">₹500-800</span>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <Clock className="w-8 h-8 text-green-600 dark:text-green-400" />
+                      <h4 className="font-bold text-gray-900 dark:text-white">By Train</h4>
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 mb-3">Nearest railway station with regular connections</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">{t('destDetail.duration')}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">3-4 hours</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">{t('destDetail.cost')}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">₹200-600</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <Navigation className="w-8 h-8 text-green-600 dark:text-green-400" />
+                      <h4 className="font-bold text-gray-900 dark:text-white">By Air</h4>
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 mb-3">Nearest airport with connecting flights</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">{t('destDetail.duration')}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">1-2 hours</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">{t('destDetail.cost')}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">₹3000-8000</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -546,20 +677,20 @@ export default function DestinationDetail() {
               <div className="space-y-6">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{t('destDetail.products')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {destination.famousProducts.map((product, index) => (
+                  {marketplaceItems.slice(0, 6).map((product, index) => (
                     <Link
                       key={index}
-                      to={`/marketplace?product=${product.marketplaceId}`}
+                      to={`/marketplace?product=${product.id}`}
                       className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105"
                     >
                       <img
                         src={product.image}
-                        alt={product.name}
+                        alt={product.title}
                         className="w-full h-48 object-cover"
                       />
                       <div className="p-4">
-                        <h4 className="font-bold text-gray-900 dark:text-white mb-2">{product.name}</h4>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">{product.description}</p>
+                        <h4 className="font-bold text-gray-900 dark:text-white mb-2">{product.title}</h4>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">{product.story}</p>
                         <div className="flex items-center justify-between">
                           <span className="text-lg font-bold text-green-600 dark:text-green-400">{product.price}</span>
                           <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
@@ -571,6 +702,11 @@ export default function DestinationDetail() {
                     </Link>
                   ))}
                 </div>
+                {marketplaceItems.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 dark:text-gray-400">No local products available yet</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
