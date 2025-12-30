@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Send, Mic, HelpCircle, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useChatHistory } from '../context/ChatHistoryContext';
+import { API_ENDPOINTS } from '../config/api';
 
 export default function Chatbot() {
   const { t } = useLanguage();
@@ -65,7 +66,7 @@ export default function Chatbot() {
       
       try {
         // Call the backend chatbot API
-        const response = await fetch('http://localhost:5000/api/chatbot/chat', {
+        const response = await fetch(API_ENDPOINTS.CHATBOT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -120,7 +121,7 @@ export default function Chatbot() {
       
       (async () => {
         try {
-          const response = await fetch('http://localhost:5000/api/chatbot/chat', {
+          const response = await fetch(API_ENDPOINTS.CHATBOT, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

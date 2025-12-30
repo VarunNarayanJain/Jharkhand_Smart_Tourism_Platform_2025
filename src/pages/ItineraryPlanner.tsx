@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { MapPin, Clock, Users, Download, Sparkles, Plus, X, Save, History, Trash2, Edit3 } from 'lucide-react';
 import { useItinerary } from '../context/ItineraryContext';
 import { useLanguage } from '../context/LanguageContext';
+import { API_ENDPOINTS } from '../config/api';
 
 export default function ItineraryPlanner() {
   const { t } = useLanguage();
@@ -78,7 +79,7 @@ export default function ItineraryPlanner() {
     
     try {
       // Call the backend API to generate itinerary
-      const response = await fetch('http://localhost:5000/api/itinerary/generate', {
+      const response = await fetch(API_ENDPOINTS.ITINERARY_GENERATE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
