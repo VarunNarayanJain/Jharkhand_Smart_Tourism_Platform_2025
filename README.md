@@ -456,8 +456,7 @@ copies or substantial portions of the Software.
 ## 📞 Support & Contact
 
 - **GitHub Issues**: [Report bugs or request features](https://github.com/VarunNarayanJain/Smart_India_Hackathon_2025/issues)
-- **Email**: varunnarayanjain@example.com
-- **Documentation**: [Visit our Wiki](https://github.com/VarunNarayanJain/Smart_India_Hackathon_2025/wiki)
+- **Email**: varunnarayanjaincorporate@gmail.com
 
 ## 🎉 Acknowledgments
 
