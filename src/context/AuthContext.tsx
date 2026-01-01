@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           data: {
             name: name,
           },
+          emailRedirectTo: `${window.location.origin}/`,
         },
       });
 

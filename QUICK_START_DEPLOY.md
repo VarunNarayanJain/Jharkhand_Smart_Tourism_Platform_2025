@@ -101,9 +101,9 @@ Value: <your_actual_groq_key>
 
 ```
 Key: OPENAI_API_KEY
-Value: <your_actual_openai_key>
+Value: sk-dummy-key-not-used
 ```
-**Get it from**: https://platform.openai.com/api-keys (if you have one)
+**Note**: If you're using Groq (recommended), you can use a dummy key like above. Or get a real key from https://platform.openai.com/api-keys
 
 ```
 Key: FRONTEND_URL
@@ -121,13 +121,15 @@ Value: http://localhost:5173
 
 Once deployed, you'll see a URL like:
 ```
-https://jharkhand-tourism-api.onrender.com
+https://jharkhand-smart-tourism-platform-2025.onrender.com
 ```
 
 **Test it** by opening this in your browser:
 ```
-https://jharkhand-tourism-api.onrender.com/health
+https://jharkhand-smart-tourism-platform-2025.onrender.com/health
 ```
+
+⚠️ **Note**: You might see 404 errors in Render logs for `/` - this is NORMAL! Render checks if your server is alive. Your API endpoints (`/health`, `/api/*`) work perfectly.
 
 You should see:
 ```json
@@ -175,7 +177,7 @@ Add these THREE variables:
 
 ```
 Name: VITE_API_URL
-Value: https://jharkhand-tourism-api.onrender.com
+Value: https://jharkhand-smart-tourism-platform-2025.onrender.com
 ```
 **Use YOUR actual Render URL from Step 2.6!**
 
@@ -294,6 +296,13 @@ git push origin main
 
 ## 🐛 Troubleshooting Common Issues
 
+### Missing build script error (npm error Missing script: "build")
+**Problem**: Render tried to run `npm run build` but backend doesn't need a build step
+**Solution**: 
+1. Go to Render Dashboard → Your service → Settings
+2. Change Build Command from `npm install; npm run build` to just `npm install`
+3. Save and wait for redeploy
+
 ### Backend not responding (503 error)
 **Problem**: Render free tier sleeps after 15 min of inactivity
 **Solution**: First request wakes it up (takes 30 sec)
@@ -310,8 +319,13 @@ git push origin main
 **Problem**: Missing or invalid API key
 **Solution**:
 1. Check Render logs for errors
-2. Verify `GROQ_API_KEY` or `OPENAI_API_KEY` in Render environment
+2. Verify `GROQ_API_KEY` in Render environment
 3. Test key at https://console.groq.com/
+4. If using dummy OPENAI_API_KEY, make sure GROQ_API_KEY is set correctly
+
+### OpenAI API key error on startup
+**Problem**: Backend crashes with "OPENAI_API_KEY environment variable is missing"
+**Solution**: Set `OPENAI_API_KEY` to `sk-dummy-key-not-used` in Render environment variables (if you're using Groq instead)
 
 ### Build fails on Vercel
 **Problem**: TypeScript errors or missing dependencies
