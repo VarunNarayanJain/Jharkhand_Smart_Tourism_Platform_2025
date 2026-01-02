@@ -1,6 +1,6 @@
 
 import { Link } from 'react-router-dom';
-import { Mountain, Phone, Mail, MapPin, Facebook, Twitter, Instagram } from 'lucide-react';
+import { Phone, Mail, MapPin, Facebook, Twitter, Instagram } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function Footer() {
@@ -13,9 +13,11 @@ export default function Footer() {
           {/* Logo & Tagline */}
           <div className="lg:col-span-1">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center">
-                <Mountain className="w-6 h-6 text-white" />
-              </div>
+              <img 
+                src="/Logoo.png" 
+                alt="Jharkhand Tourism" 
+                className="w-12 h-12 object-contain"
+              />
               <div>
                 <h2 className="text-lg font-bold">{t('header.jharkhandTourism')}</h2>
                 <p className="text-sm text-green-400">{t('header.ecoPortal')}</p>

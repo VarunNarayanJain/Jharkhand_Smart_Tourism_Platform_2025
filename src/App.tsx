@@ -12,18 +12,20 @@ import Dashboard from './pages/Dashboard';
 import DatabaseTest from './pages/DatabaseTest';
 import { ItineraryProvider } from './context/ItineraryContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ChatHistoryProvider } from './context/ChatHistoryContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <ItineraryProvider>
-          <ChatHistoryProvider>
-            <Router>
-            <div className="min-h-screen bg-neutral-900 text-neutral-100">
+    <ThemeProvider>
+      <AuthProvider>
+        <LanguageProvider>
+          <ItineraryProvider>
+            <ChatHistoryProvider>
+              <Router>
+              <div className="min-h-screen bg-neutral-900 text-neutral-100">
               <Header />
               <main>
                 <Routes>
@@ -61,6 +63,7 @@ function App() {
         </ItineraryProvider>
       </LanguageProvider>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

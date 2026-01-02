@@ -1,19 +1,26 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Globe, User, LogIn, LogOut, Sun, Moon } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Globe, User, LogIn, LogOut } from 'lucide-react';
+// import { useTheme } from '../context/ThemeContext'; // Hidden for now
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import GlobalAuthModal from './GlobalAuthModal';
 
 export default function Header() {
-  const { theme, toggleTheme } = useTheme();
+  // const { theme, toggleTheme } = useTheme(); // Hidden for now
   const { language, toggleLanguage, t } = useLanguage();
   const { user, signOut } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsMenuOpen(false);
+  };
 
   const navigation = [
     { name: t('header.home'), path: '/' },
@@ -28,10 +35,10 @@ export default function Header() {
 
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-lg dark:shadow-black/30 fixed top-0 left-0 right-0 z-50 border-b border-white/20 dark:border-gray-700/30 transition-all duration-500">
-      <div className="w-full px-4 lg:px-6 xl:px-8">
-        <div className="flex justify-between items-center py-3 lg:py-4 gap-2 lg:gap-4">
+      <div className="w-full max-w-screen-2xl mx-auto px-4 lg:px-6 xl:px-8">
+        <div className="flex justify-between items-center py-3 lg:py-4 gap-2">
           {/* Logo Section - Left */}
-          <Link to="/" className="flex items-center space-x-2 lg:space-x-3 group min-w-0 flex-shrink-0">
+          <Link to="/" className="flex items-center space-x-2 lg:space-x-3 group flex-shrink-0">
             <div className="relative">
               <img
                 src="/Logoo.png"
@@ -40,24 +47,24 @@ export default function Header() {
               />
               <div className="absolute inset-0 bg-gradient-to-r from-green-400/20 to-blue-500/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-300 opacity-0 group-hover:opacity-100"></div>
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-lg lg:text-xl xl:text-2xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
+            <div className="hidden sm:block min-w-0">
+              <h1 className="text-lg lg:text-xl xl:text-2xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent truncate">
                 {t('header.jharkhandTourism')}
               </h1>
-              <p className="text-xs text-green-600/80 dark:text-green-400/80 font-medium tracking-wide">
+              <p className="text-xs text-green-600/80 dark:text-green-400/80 font-medium tracking-wide truncate">
                 {t('header.ecoPortal')}
               </p>
             </div>
           </Link>
 
           {/* Desktop Navigation - Center */}
-          <nav className="hidden lg:flex items-center justify-center flex-1 mx-4 xl:mx-8">
-            <div className="flex items-center space-x-1 xl:space-x-2 bg-white/60 dark:bg-gray-800/60 backdrop-blur-md rounded-full px-2 xl:px-3 py-2 border border-white/30 dark:border-gray-700/30 shadow-lg max-w-fit">
+          <nav className="hidden lg:flex items-center justify-center flex-1 mx-2 min-w-0">
+            <div className="flex items-center space-x-1 bg-white/60 dark:bg-gray-800/60 backdrop-blur-md rounded-full px-2 py-2 border border-white/30 dark:border-gray-700/30 shadow-lg">
               {navigation.map((item) => (
-                <Link
+                <button
                   key={item.path}
-                  to={item.path}
-                  className={`relative px-2 xl:px-4 py-2 xl:py-2.5 rounded-full text-xs xl:text-sm font-medium transition-all duration-300 hover:scale-105 group whitespace-nowrap ${
+                  onClick={() => handleNavigation(item.path)}
+                  className={`relative px-3 py-2 rounded-full text-xs font-medium transition-all duration-300 hover:scale-105 group whitespace-nowrap ${
                     location.pathname === item.path
                       ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/25'
                       : 'text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 hover:bg-white/80 dark:hover:bg-gray-700/80'
@@ -67,15 +74,15 @@ export default function Header() {
                   {location.pathname === item.path && (
                     <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-green-600 rounded-full blur opacity-75 group-hover:opacity-100 transition-opacity duration-300"></div>
                   )}
-                </Link>
+                </button>
               ))}
             </div>
           </nav>
 
           {/* Right Section - Controls & Auth */}
           <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0">
-            {/* Theme Toggle */}
-            <button
+            {/* Theme Toggle - Hidden for now */}
+            {/* <button
               onClick={toggleTheme}
               className="p-2 lg:p-2.5 rounded-full bg-white/60 dark:bg-gray-800/60 backdrop-blur-md hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-300 hover:scale-110 hover:shadow-lg border border-white/30 dark:border-gray-700/30 group"
             >
@@ -84,7 +91,7 @@ export default function Header() {
               ) : (
                 <Sun className="w-4 h-4 lg:w-5 lg:h-5 text-yellow-500 transition-all duration-300 group-hover:rotate-12 group-hover:text-yellow-400" />
               )}
-            </button>
+            </button> */}
 
             {/* Language Toggle */}
             <button
@@ -162,21 +169,20 @@ export default function Header() {
           <div className="lg:hidden pb-4 border-t border-white/20 dark:border-gray-700/30 animate-fadeIn bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-b-2xl mx-4 mt-2">
             <nav className="flex flex-col space-y-2 p-4">
               {navigation.map((item) => (
-                <Link
+                <button
                   key={item.path}
-                  to={item.path}
-                  className={`px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg relative group ${
+                  onClick={() => handleNavigation(item.path)}
+                  className={`px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg relative group w-full text-left ${
                     location.pathname === item.path
                       ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/25'
                       : 'text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 hover:bg-white/80 dark:hover:bg-gray-700/80 backdrop-blur-md'
                   }`}
-                  onClick={() => setIsMenuOpen(false)}
                 >
                   <span className="relative z-10">{item.name}</span>
                   {location.pathname === item.path && (
                     <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-green-600 rounded-2xl blur opacity-75"></div>
                   )}
-                </Link>
+                </button>
               ))}
               
               {/* Mobile Auth Buttons */}
