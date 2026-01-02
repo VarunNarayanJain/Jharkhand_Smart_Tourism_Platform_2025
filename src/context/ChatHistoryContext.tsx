@@ -93,7 +93,7 @@ export const ChatHistoryProvider: React.FC<ChatHistoryProviderProps> = ({ childr
     }
   }, [chatSessions, user]);
 
-  // Load user data when user changes
+  // Load user data when user changes - ONLY run when user changes!
   useEffect(() => {
     if (user) {
       console.log('👤 Loading chat data for user:', user.id);
@@ -110,27 +110,26 @@ export const ChatHistoryProvider: React.FC<ChatHistoryProviderProps> = ({ childr
           if (activeSession) {
             setCurrentSession(activeSession);
           } else if (sessions.length > 0) {
-            // If no active session, create a new one or use the most recent
+            // If no active session, use the most recent
             const mostRecent = sessions[0];
-            setCurrentSession(mostRecent);
+            const updatedSession = { ...mostRecent, isActive: true };
+            setCurrentSession(updatedSession);
+            setChatSessions([updatedSession, ...sessions.slice(1).map((s: ChatSession) => ({ ...s, isActive: false }))]);
           }
         } catch (e) {
           console.error('Error loading chat sessions:', e);
           setChatSessions([]);
           setCurrentSession(null);
         }
-      } else {
-        // Create initial session for new user
-        const initialSession = createInitialSession();
-        setChatSessions([initialSession]);
-        setCurrentSession(initialSession);
       }
+      // Don't create initial session here - let the component do it when needed
     } else {
       // Clear data when user logs out
       setChatSessions([]);
       setCurrentSession(null);
     }
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only depend on user.id to prevent infinite loops
 
   // Helper function to create initial session
   const createInitialSession = (): ChatSession => {
@@ -153,7 +152,10 @@ export const ChatHistoryProvider: React.FC<ChatHistoryProviderProps> = ({ childr
 
   // Add message to current session
   const addMessage = (text: string, isUser: boolean, metadata?: ChatMessage['metadata']) => {
-    if (!currentSession) return;
+    if (!currentSession) {
+      console.warn('⚠️ Cannot add message: no current session');
+      return;
+    }
 
     const newMessage: ChatMessage = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -165,22 +167,35 @@ export const ChatHistoryProvider: React.FC<ChatHistoryProviderProps> = ({ childr
 
     console.log('💬 Adding message to session:', currentSession.id, newMessage);
 
-    const updatedSession = {
-      ...currentSession,
-      messages: [...currentSession.messages, newMessage],
-      updatedAt: new Date().toISOString(),
-      // Auto-generate title from first user message
-      title: currentSession.title === 'New Chat' && isUser ? 
-        text.substring(0, 30) + (text.length > 30 ? '...' : '') : 
-        currentSession.title
-    };
+    // Use functional update to get the latest state
+    setCurrentSession((prevSession) => {
+      if (!prevSession) return null;
+      
+      return {
+        ...prevSession,
+        messages: [...prevSession.messages, newMessage],
+        updatedAt: new Date().toISOString(),
+        // Auto-generate title from first user message
+        title: prevSession.title === 'New Chat' && isUser ? 
+          text.substring(0, 30) + (text.length > 30 ? '...' : '') : 
+          prevSession.title
+      };
+    });
 
-    setCurrentSession(updatedSession);
-
-    // Update in sessions list
-    setChatSessions(prev => prev.map(session => 
-      session.id === currentSession.id ? updatedSession : session
-    ));
+    // Update in sessions list using functional update
+    setChatSessions(prev => prev.map(session => {
+      if (session.id === currentSession.id) {
+        return {
+          ...session,
+          messages: [...session.messages, newMessage],
+          updatedAt: new Date().toISOString(),
+          title: session.title === 'New Chat' && isUser ? 
+            text.substring(0, 30) + (text.length > 30 ? '...' : '') : 
+            session.title
+        };
+      }
+      return session;
+    }));
   };
 
   // Clear current session messages

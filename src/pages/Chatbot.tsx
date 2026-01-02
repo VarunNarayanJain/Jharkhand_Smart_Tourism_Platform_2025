@@ -23,24 +23,27 @@ export default function Chatbot() {
     }
   }, [currentSession?.messages]);
 
-  // Ensure user has a persistent chat session
+  // Ensure user has a persistent chat session - ONLY run once on mount
   useEffect(() => {
     if (!currentSession) {
-      // Create a single persistent session for the user
+      console.log('🔧 Creating initial chat session');
       createNewSession('My Chat');
     }
-  }, [currentSession, createNewSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once!
 
-  // Add welcome message if it's the first time or no messages exist
+  // Add welcome message if session exists but has no messages
   useEffect(() => {
     if (currentSession && currentSession.messages.length === 0) {
+      console.log('👋 Adding welcome message to session:', currentSession.id);
       addMessage(
         t('chatbot.welcome'),
         false,
         { type: 'text' }
       );
     }
-  }, [currentSession?.id, addMessage, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSession?.id]); // Only run when session ID changes
 
   const faqItems = [
     t('chatbot.howToReach'),
@@ -53,18 +56,35 @@ export default function Chatbot() {
 
   const handleSendMessage = async () => {
     if (newMessage.trim() && !isLoading && currentSession) {
-      // Add user message to context
-      addMessage(
-        newMessage.trim(),
-        true,
-        { type: 'text' }
-      );
+      const currentMessage = newMessage.trim();
+      const currentMessages = currentSession.messages;
       
-      const currentMessage = newMessage;
+      console.log('📤 Sending message:', currentMessage);
+      console.log('📊 Current messages before send:', currentMessages.length);
+      
+      // Clear input immediately
       setNewMessage('');
+      
+      // Add user message to UI
+      addMessage(currentMessage, true, { type: 'text' });
+      
       setIsLoading(true);
       
       try {
+        // Build conversation history including the message we just added
+        const conversationHistory = [
+          ...currentMessages.slice(-9).map(msg => ({
+            role: msg.isUser ? 'user' : 'assistant',
+            content: msg.text
+          })),
+          {
+            role: 'user',
+            content: currentMessage
+          }
+        ];
+        
+        console.log('🔄 Calling API with history length:', conversationHistory.length);
+        
         // Call the backend chatbot API
         const response = await fetch(API_ENDPOINTS.CHATBOT, {
           method: 'POST',
@@ -73,10 +93,7 @@ export default function Chatbot() {
           },
           body: JSON.stringify({
             message: currentMessage,
-            conversationHistory: currentSession.messages.slice(-10).map(msg => ({
-              role: msg.isUser ? 'user' : 'assistant',
-              content: msg.text
-            }))
+            conversationHistory: conversationHistory
           })
         });
 
@@ -86,7 +103,10 @@ export default function Chatbot() {
 
         const data = await response.json();
         
+        console.log('✅ API response received:', data.success);
+        
         if (data.success) {
+          console.log('📥 Adding bot response');
           addMessage(
             data.response,
             false,
@@ -95,6 +115,7 @@ export default function Chatbot() {
               suggestions: data.quickActions || []
             }
           );
+          console.log('✅ Bot response added');
         } else {
           throw new Error(data.message || 'Failed to get response');
         }
@@ -113,14 +134,27 @@ export default function Chatbot() {
 
   const handleFAQClick = (question: string) => {
     if (!isLoading && currentSession) {
-      // Directly add the FAQ question as a user message
+      const currentMessages = currentSession.messages;
+      
+      // Add the FAQ question as a user message
       addMessage(question, true, { type: 'text' });
       
-      // Then process it as if it was sent
       setIsLoading(true);
       
       (async () => {
         try {
+          // Build conversation history including the message we just added
+          const conversationHistory = [
+            ...currentMessages.slice(-9).map(msg => ({
+              role: msg.isUser ? 'user' : 'assistant',
+              content: msg.text
+            })),
+            {
+              role: 'user',
+              content: question
+            }
+          ];
+          
           const response = await fetch(API_ENDPOINTS.CHATBOT, {
             method: 'POST',
             headers: {
@@ -128,10 +162,7 @@ export default function Chatbot() {
             },
             body: JSON.stringify({
               message: question,
-              conversationHistory: currentSession.messages.slice(-10).map(msg => ({
-                role: msg.isUser ? 'user' : 'assistant',
-                content: msg.text
-              }))
+              conversationHistory: conversationHistory
             })
           });
 
