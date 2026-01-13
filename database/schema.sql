@@ -47,14 +47,22 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 -- =============================================
 CREATE TABLE IF NOT EXISTS itineraries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   days INTEGER NOT NULL,
   budget_range VARCHAR(100),
   group_type VARCHAR(50),
-  destinations INTEGER[], -- Array of destination IDs
+  destination_ids INTEGER[], -- Array of destination IDs (references destinations table)
+  destinations TEXT[], -- Array of destination names (for display)
   activities TEXT[], -- Array of activities
   is_public BOOLEAN DEFAULT FALSE,
+  start_city VARCHAR(255), -- Starting city for the trip
+  start_date DATE, -- Trip start date
+  end_date DATE, -- Trip end date
+  duration VARCHAR(100), -- e.g., "3 Days / 2 Nights"
+  budget VARCHAR(100), -- Budget estimate
+  interests TEXT[], -- User interests/preferences
+  generated_plan JSONB, -- Full AI-generated itinerary plan
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

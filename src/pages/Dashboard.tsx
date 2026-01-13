@@ -13,9 +13,22 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user, loading } = useAuth();
+  
+  // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const [activeTab, setActiveTab] = useState('overview');
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  
+  // Rating state for reviews (must be declared before any returns)
+  type RatingState = {
+    [key: number]: { stars: number; honest: boolean; badge: boolean; comment: string };
+  };
+  const [ratings, setRatings] = useState<RatingState>({});
+
+  // Debug logging
+  useEffect(() => {
+    console.log('📊 Dashboard - User state:', { user: !!user, loading, email: user?.email });
+  }, [user, loading]);
 
   // Jharkhand Landscapes for Slideshow
   const backgroundImages = [
@@ -26,12 +39,13 @@ export default function Dashboard() {
     '/haz1.jpg' // Hazaribagh
   ];
 
+  // Background slideshow effect
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentBgIndex((prev) => (prev + 1) % backgroundImages.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [backgroundImages.length]); // Add dependency
 
   // Show auth modal if not logged in
   useEffect(() => {
@@ -40,7 +54,7 @@ export default function Dashboard() {
     }
   }, [user, loading]);
 
-  // Show loading state
+  // Show loading state while checking authentication
   if (loading) {
     return (
       <div className="pt-20 min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
@@ -52,11 +66,11 @@ export default function Dashboard() {
     );
   }
 
-  // If no user after loading, show the auth modal
+  // If no user after loading, show the auth modal with proper UI
   if (!user) {
     return (
-      <>
-        <div className="pt-20 min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+      <div className="pt-20 min-h-screen bg-gray-50 dark:bg-black">
+        <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
           <div className="text-center max-w-md mx-auto px-4">
             <div className="mb-6">
               <Shield className="w-20 h-20 text-green-600 mx-auto mb-4" />
@@ -83,22 +97,11 @@ export default function Dashboard() {
           }} 
           initialMode="signup"
         />
-      </>
+      </div>
     );
   }
 
-  const userProfile = {
-    name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-    image: user.user_metadata?.avatar_url || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1',
-    verified: true,
-    email: user.email || '',
-    phone: user.phone || '+91 XXXXX XXXXX',
-    preferences: ['Nature', 'Culture', 'Local Food'],
-    memberSince: 'Jan 2024',
-    tripsPlanned: 12,
-    reviewsGiven: 8
-  };
-
+  // Analytics data
   const analyticsData = {
     totalItineraries: 1247,
     activeGuides: 68,
@@ -126,11 +129,7 @@ export default function Dashboard() {
     { id: 13, name: 'Santosh Mahato', category: 'Artisan', location: 'Saraikela', image: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1' },
   ];
 
-  type RatingState = {
-    [key: number]: { stars: number; honest: boolean; badge: boolean; comment: string };
-  };
-  const [ratings, setRatings] = useState<RatingState>({});
-
+  // Helper function for updating ratings
   const updateRating = (id: number, partial: Partial<RatingState[number]>) => {
     setRatings((prev) => {
       const base = prev[id] || { stars: 0, honest: false, badge: false, comment: '' };
@@ -164,6 +163,21 @@ export default function Dashboard() {
     { id: 'safety', label: 'Safety Center', icon: Shield },
   ];
 
+  // Safety check for user profile
+  const safeUserProfile = {
+    name: user?.user_metadata?.name || user?.email?.split('@')[0] || 'User',
+    image: user?.user_metadata?.avatar_url || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1',
+    verified: true,
+    email: user?.email || '',
+    phone: user?.phone || '+91 XXXXX XXXXX',
+    preferences: ['Nature', 'Culture', 'Local Food'],
+    memberSince: 'Jan 2024',
+    tripsPlanned: 12,
+    reviewsGiven: 8
+  };
+
+  console.log('📊 Dashboard rendering with user:', safeUserProfile.name);
+
   return (
     <div className="pt-20 min-h-screen bg-gray-50 dark:bg-black transition-colors duration-300">
       {/* Hero Header */}
@@ -179,7 +193,11 @@ export default function Dashboard() {
             >
               <img 
                 src={img} 
-                alt={`Jharkhand Landscape ${index + 1}`} 
+                alt={`Jharkhand Landscape ${index + 1}`}
+                onError={(e) => {
+                  console.warn(`Failed to load image: ${img}`);
+                  e.currentTarget.style.display = 'none';
+                }}
                 className="w-full h-full object-cover opacity-50 transform scale-105 group-hover:scale-110 transition-transform duration-[20s]"
               />
             </div>
@@ -190,9 +208,9 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row md:items-end md:space-x-8 w-full">
             <div className="relative -mb-12 md:mb-0">
               <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl border-4 border-white dark:border-gray-800 overflow-hidden shadow-2xl">
-                <img src={userProfile.image} alt={userProfile.name} className="w-full h-full object-cover" />
+                <img src={safeUserProfile.image} alt={safeUserProfile.name} className="w-full h-full object-cover" />
               </div>
-              {userProfile.verified && (
+              {safeUserProfile.verified && (
                 <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-1.5 rounded-full border-4 border-gray-900">
                   <CheckCircle className="w-5 h-5" />
                 </div>
@@ -200,11 +218,11 @@ export default function Dashboard() {
             </div>
             <div className="mt-14 md:mt-0 flex-1">
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                Welcome, {userProfile.name.split(' ')[0]}!
+                Welcome, {safeUserProfile.name.split(' ')[0]}!
               </h1>
               <p className="text-gray-300 flex items-center space-x-4 text-sm md:text-base">
                 <span className="flex items-center"><MapPin className="w-4 h-4 mr-1" /> Ranchi, Jharkhand</span>
-                <span className="flex items-center"><Calendar className="w-4 h-4 mr-1" /> Member since {userProfile.memberSince}</span>
+                <span className="flex items-center"><Calendar className="w-4 h-4 mr-1" /> Member since {safeUserProfile.memberSince}</span>
               </p>
             </div>
             <div className="mt-6 md:mt-0 flex space-x-3">
@@ -252,8 +270,8 @@ export default function Dashboard() {
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                  { label: 'Trips Planned', value: userProfile.tripsPlanned, icon: Navigation, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-                  { label: 'Reviews Given', value: userProfile.reviewsGiven, icon: Star, color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
+                  { label: 'Trips Planned', value: safeUserProfile.tripsPlanned, icon: Navigation, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+                  { label: 'Reviews Given', value: safeUserProfile.reviewsGiven, icon: Star, color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
                   { label: 'Saved Places', value: '24', icon: Heart, color: 'text-pink-600', bg: 'bg-pink-100 dark:bg-pink-900/30' },
                   { label: 'Community Rank', value: 'Explorer', icon: BadgeCheck, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30' },
                 ].map((stat, idx) => (

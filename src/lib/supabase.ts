@@ -48,11 +48,20 @@ export interface Itinerary {
   id: string;
   user_id: string;
   title: string;
-  days: number;
-  budget_range: string;
-  group_type: string;
-  destinations: number[];
-  activities: string[];
+  days: number; // Required field - number of days in the trip
+  start_city?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  duration?: string | null;
+  budget?: string | null;
+  budget_range?: string | null;
+  group_type?: string | null;
+  destinations?: string[] | null; // Text array of destination names
+  destination_ids?: number[] | null; // Integer array of destination IDs
+  interests?: string[] | null;
+  activities?: string[] | null;
+  generated_plan?: any | null; // JSONB field for full AI-generated plan
+  is_public?: boolean;
   created_at?: string;
   updated_at?: string;
 }

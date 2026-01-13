@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MapPin, Clock, Users, Download, Sparkles, Plus, X, Save, History, Trash2, Edit3 } from 'lucide-react';
+import { MapPin, Clock, Users, Download, Sparkles, Plus, X, Save, History, Trash2 } from 'lucide-react';
 import { useItinerary } from '../context/ItineraryContext';
 import { useLanguage } from '../context/LanguageContext';
 import { API_ENDPOINTS } from '../config/api';
@@ -25,7 +25,8 @@ export default function ItineraryPlanner() {
   // Get all context methods and data
   const { 
     currentItinerary, 
-    savedItineraries, 
+    savedItineraries,
+    loading: itinerariesLoading,
     addDesiredPlace, 
     removeDesiredPlace, 
     updateItineraryDetails,
@@ -104,6 +105,17 @@ export default function ItineraryPlanner() {
         console.log('✅ Itinerary generated successfully:', data);
         // Store the AI-generated itinerary
         setGeneratedItinerary(data.itinerary);
+        
+        // Update the context with form data
+        updateItineraryDetails({
+          duration: formData.duration,
+          budget: data.itinerary?.estimatedBudget,
+          preferences: formData.interests,
+          startCity: formData.startCity,
+          dates: formData.dates,
+          groupType: formData.groupType
+        });
+        
         setShowResults(true);
       } else {
         throw new Error(data.message || 'Failed to generate itinerary');
@@ -427,16 +439,18 @@ export default function ItineraryPlanner() {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         const title = prompt('Enter a title for this itinerary:', currentItinerary.title || `Trip to ${formData.startCity || 'Multiple Destinations'} - ${new Date().toLocaleDateString()}`);
                         if (title) {
-                          updateItineraryDetails({
-                            duration: formData.duration,
-                            preferences: formData.interests
-                          });
-                          setItineraryTitle(title);
-                          saveCurrentItinerary();
-                          alert('Itinerary saved successfully! You can find it in the "Previous Trips" tab.');
+                          try {
+                            setItineraryTitle(title);
+                            // Save with the generated plan
+                            await saveCurrentItinerary(generatedItinerary);
+                            alert('✅ Itinerary saved successfully! You can find it in the "Previous Trips" tab.');
+                          } catch (error) {
+                            console.error('Error saving itinerary:', error);
+                            // Alert already shown in context
+                          }
                         }
                       }}
                       className="w-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 py-3 px-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center space-x-2 border border-blue-200 dark:border-blue-800"
@@ -654,12 +668,16 @@ export default function ItineraryPlanner() {
                 </div>
                 {currentItinerary.title && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const title = prompt('Enter itinerary title:', currentItinerary.title || `Trip ${new Date().toLocaleDateString()}`);
                       if (title) {
-                        setItineraryTitle(title);
-                        saveCurrentItinerary();
-                        alert('Current itinerary saved!');
+                        try {
+                          setItineraryTitle(title);
+                          await saveCurrentItinerary(generatedItinerary);
+                          alert('✅ Current itinerary saved successfully!');
+                        } catch (error) {
+                          console.error('Error saving itinerary:', error);
+                        }
                       }
                     }}
                     className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl flex items-center space-x-2 transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95 font-medium"
@@ -671,89 +689,206 @@ export default function ItineraryPlanner() {
               </div>
 
               {savedItineraries.length === 0 ? (
-                <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700">
-                  <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-sm mx-auto mb-4">
-                    <History className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                itinerariesLoading ? (
+                  <div className="text-center py-16">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-600 border-t-transparent mx-auto mb-6"></div>
+                    <p className="text-gray-600 dark:text-gray-400 text-lg">Loading your itineraries...</p>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No saved itineraries yet</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                    Your travel history is empty. Start planning your first adventure in Jharkhand!
-                  </p>
-                  <button
-                    onClick={() => setActiveTab('planner')}
-                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95"
-                  >
-                    Plan Your First Trip
-                  </button>
-                </div>
+                ) : (
+                  <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                    <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-sm mx-auto mb-4">
+                      <History className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No saved itineraries yet</h3>
+                    <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                      Your travel history is empty. Start planning your first adventure in Jharkhand!
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('planner')}
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95"
+                    >
+                      Plan Your First Trip
+                    </button>
+                  </div>
+                )
               ) : (
                 <div className="grid gap-6">
                   {savedItineraries.map((itinerary) => (
-                    <div key={itinerary.id} className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 hover:border-green-500 dark:hover:border-green-500 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                    <div key={itinerary.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:border-green-500 dark:hover:border-green-500 hover:shadow-xl transition-all duration-300">
+                      {/* Header */}
+                      <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                               {itinerary.title}
                             </h3>
-                            <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300">
-                              {new Date(itinerary.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400 mb-4">
-                            <span className="flex items-center space-x-1.5">
-                              <MapPin className="w-4 h-4" />
-                              <span>{itinerary.destinations.length} destinations</span>
-                            </span>
-                            <span className="flex items-center space-x-1.5">
-                              <Clock className="w-4 h-4" />
-                              <span>{itinerary.details?.duration || 'Flexible'} duration</span>
-                            </span>
-                          </div>
-
-                          {itinerary.destinations.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {itinerary.destinations.slice(0, 4).map((dest, index) => (
-                                <span key={index} className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-3 py-1 rounded-lg text-xs font-medium border border-green-100 dark:border-green-800/30">
-                                  {dest}
-                                </span>
-                              ))}
-                              {itinerary.destinations.length > 4 && (
-                                <span className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-3 py-1 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700">
-                                  +{itinerary.destinations.length - 4} more
+                            
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
+                              <span className="flex items-center gap-1.5">
+                                <MapPin className="w-4 h-4" />
+                                {itinerary.destinations.length} destinations
+                              </span>
+                              {itinerary.details?.duration && (
+                                <span className="flex items-center gap-1.5">
+                                  <Clock className="w-4 h-4" />
+                                  {itinerary.details.duration}
                                 </span>
                               )}
+                              {itinerary.details?.startCity && (
+                                <span className="flex items-center gap-1.5">
+                                  <MapPin className="w-4 h-4" />
+                                  From {itinerary.details.startCity}
+                                </span>
+                              )}
+                              <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium">
+                                {new Date(itinerary.createdAt).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  year: 'numeric' 
+                                })}
+                              </span>
                             </div>
-                          )}
-                        </div>
 
-                        <div className="flex items-center space-x-3 pt-4 md:pt-0 border-t md:border-t-0 border-gray-100 dark:border-gray-800">
-                          <button
-                            onClick={() => {
-                              loadItinerary(itinerary.id);
-                              setActiveTab('planner');
-                            }}
-                            className="flex-1 md:flex-none px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl font-medium transition-colors duration-200 flex items-center justify-center space-x-2"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('Are you sure you want to delete this itinerary?')) {
-                                deleteItinerary(itinerary.id);
-                              }
-                            }}
-                            className="flex-1 md:flex-none px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-medium transition-colors duration-200 flex items-center justify-center space-x-2"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span>Delete</span>
-                          </button>
+                            {itinerary.destinations.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {itinerary.destinations.map((dest, index) => (
+                                  <span key={index} className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-3 py-1 rounded-lg text-xs font-medium border border-green-100 dark:border-green-800/30">
+                                    {dest}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={async () => {
+                                if (confirm('Are you sure you want to delete this itinerary? This cannot be undone.')) {
+                                  try {
+                                    await deleteItinerary(itinerary.id);
+                                  } catch (error) {
+                                    console.error('Error deleting itinerary:', error);
+                                  }
+                                }
+                              }}
+                              className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-medium transition-colors duration-200 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Itinerary Details (Expandable) */}
+                      {itinerary.generatedPlan && (
+                        <div className="p-6 bg-gray-50 dark:bg-gray-900/50">
+                          <details className="group">
+                            <summary className="cursor-pointer list-none flex items-center justify-between text-gray-900 dark:text-white font-semibold hover:text-green-600 dark:hover:text-green-400 transition-colors">
+                              <span className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4" />
+                                View Complete Itinerary
+                              </span>
+                              <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </summary>
+                            
+                            <div className="mt-6 space-y-4">
+                              {Array.isArray(itinerary.generatedPlan) ? (
+                                itinerary.generatedPlan.map((day: any, dayIndex: number) => (
+                                  <div key={dayIndex} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-4">
+                                      <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                        <span className="text-green-700 dark:text-green-400 font-bold text-lg">
+                                          {day.day || dayIndex + 1}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <h4 className="font-bold text-xl text-gray-900 dark:text-white">
+                                          Day {day.day || dayIndex + 1}
+                                        </h4>
+                                        <p className="text-green-600 dark:text-green-400 font-medium">
+                                          {day.location || day.title || 'Explore'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    
+                                    {day.activities && Array.isArray(day.activities) && (
+                                      <div className="space-y-3 mb-4">
+                                        {day.activities.map((activity: any, actIndex: number) => (
+                                          <div key={actIndex} className="flex gap-4 items-start p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                            <div className="flex-shrink-0">
+                                              <span className="inline-block px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold text-sm rounded-lg">
+                                                {activity.time}
+                                              </span>
+                                            </div>
+                                            <div className="flex-1">
+                                              <p className="text-gray-800 dark:text-gray-200 font-medium">
+                                                {activity.activity || activity.description || activity}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    
+                                    {day.recommendation && (
+                                      <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-xl border border-green-200 dark:border-green-800/30">
+                                        <div className="flex items-start gap-3">
+                                          <Sparkles className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                          <div>
+                                            <p className="text-xs font-bold text-green-800 dark:text-green-300 uppercase tracking-wider mb-1">
+                                              Pro Tip
+                                            </p>
+                                            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                              {day.recommendation}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))
+                              ) : itinerary.generatedPlan && typeof itinerary.generatedPlan === 'object' ? (
+                                // Handle object-based plans
+                                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                                  <div className="space-y-4">
+                                    {Object.entries(itinerary.generatedPlan).map(([key, value]: [string, any], index) => (
+                                      <div key={index} className="border-b border-gray-200 dark:border-gray-700 last:border-0 pb-4 last:pb-0">
+                                        <h5 className="font-semibold text-gray-900 dark:text-white mb-2 capitalize">
+                                          {key.replace(/_/g, ' ')}
+                                        </h5>
+                                        {typeof value === 'string' ? (
+                                          <p className="text-gray-700 dark:text-gray-300">{value}</p>
+                                        ) : Array.isArray(value) ? (
+                                          <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
+                                            {value.map((item, i) => (
+                                              <li key={i}>{typeof item === 'object' ? JSON.stringify(item) : item}</li>
+                                            ))}
+                                          </ul>
+                                        ) : typeof value === 'object' ? (
+                                          <pre className="text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded-lg overflow-x-auto text-gray-700 dark:text-gray-300">
+                                            {JSON.stringify(value, null, 2)}
+                                          </pre>
+                                        ) : (
+                                          <p className="text-gray-700 dark:text-gray-300">{String(value)}</p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-xl p-6 text-center">
+                                  <p className="text-yellow-800 dark:text-yellow-300 font-medium">
+                                    No itinerary details available
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </details>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

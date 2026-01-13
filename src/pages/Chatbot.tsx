@@ -132,69 +132,86 @@ export default function Chatbot() {
     }
   };
 
-  const handleFAQClick = (question: string) => {
-    if (!isLoading && currentSession) {
+  const handleFAQClick = async (question: string) => {
+    // Safety checks to prevent blank page
+    if (!question || question.trim() === '') {
+      console.error('❌ Empty question received');
+      return;
+    }
+    
+    if (isLoading) {
+      console.log('⏳ Already loading, ignoring click');
+      return;
+    }
+    
+    if (!currentSession) {
+      console.error('❌ No active chat session');
+      return;
+    }
+
+    try {
       const currentMessages = currentSession.messages;
+      
+      console.log('📤 FAQ clicked:', question);
       
       // Add the FAQ question as a user message
       addMessage(question, true, { type: 'text' });
       
       setIsLoading(true);
       
-      (async () => {
-        try {
-          // Build conversation history including the message we just added
-          const conversationHistory = [
-            ...currentMessages.slice(-9).map(msg => ({
-              role: msg.isUser ? 'user' : 'assistant',
-              content: msg.text
-            })),
-            {
-              role: 'user',
-              content: question
-            }
-          ];
-          
-          const response = await fetch(API_ENDPOINTS.CHATBOT, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: question,
-              conversationHistory: conversationHistory
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
-          
-          if (data.success) {
-            addMessage(
-              data.response,
-              false,
-              {
-                type: 'text',
-                suggestions: data.quickActions || []
-              }
-            );
-          } else {
-            throw new Error(data.message || 'Failed to get response');
-          }
-        } catch (error) {
-          console.error('❌ Error calling chatbot API:', error);
-          addMessage(
-            `Sorry, I'm having trouble connecting right now. Please try again later.`,
-            false,
-            { type: 'error' }
-          );
-        } finally {
-          setIsLoading(false);
+      // Build conversation history including the message we just added
+      const conversationHistory = [
+        ...currentMessages.slice(-9).map(msg => ({
+          role: msg.isUser ? 'user' : 'assistant',
+          content: msg.text
+        })),
+        {
+          role: 'user',
+          content: question
         }
-      })();
+      ];
+      
+      console.log('🔄 Calling chatbot API for FAQ');
+      
+      const response = await fetch(API_ENDPOINTS.CHATBOT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: question,
+          conversationHistory: conversationHistory
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ FAQ response received');
+        addMessage(
+          data.response,
+          false,
+          {
+            type: 'text',
+            suggestions: data.quickActions || []
+          }
+        );
+      } else {
+        throw new Error(data.message || 'Failed to get response');
+      }
+    } catch (error) {
+      console.error('❌ Error handling FAQ click:', error);
+      addMessage(
+        `Sorry, I'm having trouble connecting right now. Please try again later.`,
+        false,
+        { type: 'error' }
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -358,8 +375,13 @@ export default function Chatbot() {
                 {faqItems.map((item, index) => (
                   <button
                     key={index}
-                    onClick={() => handleFAQClick(item)}
-                    className="w-full text-left p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-400 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-medium transition-all duration-200 border border-transparent hover:border-green-100 dark:hover:border-green-900/30 group"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleFAQClick(item);
+                    }}
+                    disabled={isLoading}
+                    className="w-full text-left p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-400 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-medium transition-all duration-200 border border-transparent hover:border-green-100 dark:hover:border-green-900/30 group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-center justify-between">
                       <span>{item}</span>

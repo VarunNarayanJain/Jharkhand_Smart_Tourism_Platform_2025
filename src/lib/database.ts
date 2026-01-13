@@ -251,19 +251,67 @@ export const itineraryService = {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error fetching itineraries:', error);
+      throw error;
+    }
+    console.log('✅ Loaded itineraries from Supabase:', data?.length || 0);
     return data || [];
+  },
+
+  // Get a single itinerary by ID
+  async getById(id: string): Promise<Itinerary | null> {
+    const { data, error } = await supabase
+      .from('itineraries')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      console.error('❌ Error fetching itinerary:', error);
+      throw error;
+    }
+    return data;
   },
 
   // Save a new itinerary
   async save(itinerary: Omit<Itinerary, 'id' | 'created_at' | 'updated_at'>): Promise<Itinerary> {
     const { data, error } = await supabase
       .from('itineraries')
-      .insert(itinerary)
+      .insert({
+        ...itinerary,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error creating itinerary:', error);
+      throw error;
+    }
+    console.log('✅ Itinerary saved to Supabase:', data);
+    return data;
+  },
+
+  // Update an existing itinerary
+  async update(id: string, updates: Partial<Itinerary>): Promise<Itinerary> {
+    const { data, error } = await supabase
+      .from('itineraries')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error updating itinerary:', error);
+      throw error;
+    }
+    console.log('✅ Itinerary updated in Supabase:', data);
     return data;
   },
 
@@ -274,7 +322,11 @@ export const itineraryService = {
       .delete()
       .eq('id', id);
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error deleting itinerary:', error);
+      throw error;
+    }
+    console.log('✅ Itinerary deleted from Supabase:', id);
   }
 };
 
