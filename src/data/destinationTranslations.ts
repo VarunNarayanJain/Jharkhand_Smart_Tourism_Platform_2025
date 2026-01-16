@@ -16,6 +16,10 @@ export const getTranslatedDestinationName = (destinationId: number, language: 'e
     4: {
       en: 'Deoghar',
       hi: 'देवघर'
+    },
+    5: {
+      en: 'Hazaribagh',
+      hi: 'हजारीबाग'
     }
   };
 
@@ -39,6 +43,10 @@ export const getTranslatedDestinationTagline = (destinationId: number, language:
     4: {
       en: 'Abode of Gods',
       hi: 'देवताओं का निवास'
+    },
+    5: {
+      en: 'Land of Thousand Gardens',
+      hi: 'हजार बगीचों की भूमि'
     }
   };
 
@@ -62,6 +70,10 @@ export const getTranslatedDestinationDescription = (destinationId: number, langu
     4: {
       en: 'Sacred temple town famous for Baba Baidyanath Dham, one of the twelve Jyotirlingas.',
       hi: 'बाबा बैद्यनाथ धाम के लिए प्रसिद्ध पवित्र मंदिर शहर, जो बारह ज्योतिर्लिंगों में से एक है।'
+    },
+    5: {
+      en: 'A scenic paradise known for its national park, lakes, and breathtaking natural beauty.',
+      hi: 'अपने राष्ट्रीय उद्यान, झीलों और लुभावनी प्राकृतिक सुंदरता के लिए जाना जाने वाला एक दर्शनीय स्वर्ग।'
     }
   };
 

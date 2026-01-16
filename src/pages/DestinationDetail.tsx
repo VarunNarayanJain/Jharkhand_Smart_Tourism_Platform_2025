@@ -12,7 +12,6 @@ import {
   Thermometer,
   Droplets,
   Wind,
-  ShoppingBag,
   ArrowLeft,
   Plus,
   Check,
@@ -40,6 +39,11 @@ export default function DestinationDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Scroll to top when component mounts or ID changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [id]);
+
   // Fetch destination data based on ID
   useEffect(() => {
     if (!id) return;
@@ -49,11 +53,8 @@ export default function DestinationDetail() {
         setLoading(true);
         const destinationId = parseInt(id);
         
-        console.log('🔍 Fetching data for destination ID:', destinationId);
-        
         // Fetch destination details
         const destinationData = await destinationsService.getById(destinationId);
-        console.log('📍 Destination data:', destinationData);
         setDestination(destinationData);
         
         if (destinationData) {
@@ -65,24 +66,10 @@ export default function DestinationDetail() {
             marketplaceService.getAll() // Get all marketplace items
           ]);
           
-          console.log('📝 Reviews data:', reviewsData);
-          console.log('👨‍🏫 Guides data:', guidesData);
-          console.log('🍽️ Restaurants data:', restaurantsData);
-          console.log('🛍️ Marketplace data:', marketplaceData);
-          
           setReviews(reviewsData);
           setGuides(guidesData);
           setRestaurants(restaurantsData);
           setMarketplaceItems(marketplaceData);
-          
-          // Debug logging
-          console.log('Fetched data:', {
-            destination: destinationData,
-            reviews: reviewsData,
-            restaurants: restaurantsData,
-            guides: guidesData,
-            marketplace: marketplaceData
-          });
         }
       } catch (err) {
         console.error('❌ Error fetching destination data:', err);
@@ -143,7 +130,7 @@ export default function DestinationDetail() {
   const tabs = [
     { id: 'overview', label: t('destDetail.about') },
     { id: 'photos', label: t('destDetail.videos') },
-    { id: 'reviews', label: t('destDetail.reviews') },
+    // { id: 'reviews', label: t('destDetail.reviews') }, // Removed as per requirements
     { id: 'guides', label: t('destDetail.guides') },
     { id: 'eateries', label: t('destDetail.eateries') },
     { id: 'transport', label: t('destDetail.transport') },
@@ -296,11 +283,6 @@ export default function DestinationDetail() {
           </div>
 
           <div className="p-6">
-            {/* Debug info */}
-            <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-800 rounded text-sm">
-              <strong>Debug Info:</strong> Active tab = {activeTab} | Reviews: {reviews.length} | Restaurants: {restaurants.length} | Guides: {guides.length} | Marketplace: {marketplaceItems.length}
-            </div>
-            
             {/* Overview Tab */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
@@ -529,18 +511,18 @@ export default function DestinationDetail() {
                              </div>
                            </div>
                            
-                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
-                             <div>
-                               <p className="text-lg font-bold text-green-600 dark:text-green-400">{guide.hourlyRate}</p>
-                               <p className="text-xs text-gray-600 dark:text-gray-400">{t('destDetail.perHour')}</p>
-                             </div>
-                             <div className="flex space-x-2">
-                               <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors duration-200">
-                                 {t('destDetail.bookNow')}
-                               </button>
-                               <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors duration-200">
-                                 {t('destDetail.contact')}
-                               </button>
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+                             <div className="flex-1">
+                               <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{t('destDetail.contact')}</p>
+                               <a 
+                                 href={`tel:${guide.phone || '+91-XXXXXXXXXX'}`}
+                                 className="text-lg font-bold text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 transition-colors"
+                               >
+                                 {guide.phone || '+91-XXXXXXXXXX'}
+                               </a>
+                               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                 {guide.hourlyRate} / {t('destDetail.perHour')}
+                               </p>
                              </div>
                            </div>
                          </div>
@@ -678,10 +660,9 @@ export default function DestinationDetail() {
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{t('destDetail.products')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {marketplaceItems.slice(0, 6).map((product, index) => (
-                    <Link
+                    <div
                       key={index}
-                      to={`/marketplace?product=${product.id}`}
-                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300 hover:scale-105"
+                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg dark:hover:shadow-black/50 transition-all duration-300"
                     >
                       <img
                         src={product.image}
@@ -690,16 +671,20 @@ export default function DestinationDetail() {
                       />
                       <div className="p-4">
                         <h4 className="font-bold text-gray-900 dark:text-white mb-2">{product.title}</h4>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">{product.story}</p>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">{product.story}</p>
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-bold text-green-600 dark:text-green-400">{product.price}</span>
-                          <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
-                            <ShoppingBag className="w-4 h-4" />
-                            <span className="text-sm font-medium">{t('destDetail.viewInMarketplace')}</span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
+                              {product.category}
+                            </span>
+                          </div>
+                          <div className="flex items-center text-green-600 dark:text-green-400">
+                            <Star className="w-4 h-4 fill-current mr-1" />
+                            <span className="text-sm font-medium">{product.rating}</span>
                           </div>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
                 {marketplaceItems.length === 0 && (

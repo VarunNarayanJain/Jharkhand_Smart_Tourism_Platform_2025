@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, ShoppingBag, MessageCircle, LayoutDashboard, ArrowRight } from 'lucide-react';
+import { MapPin, Calendar, MessageCircle, LayoutDashboard, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function QuickSearchBar() {
@@ -34,17 +34,18 @@ export default function QuickSearchBar() {
       shadow: 'hover:shadow-blue-500/20',
       gradient: 'from-blue-500 to-indigo-500'
     },
-    {
-      title: t('header.marketplace'),
-      desc: "Shop authentic tribal handicrafts.",
-      icon: ShoppingBag,
-      path: '/marketplace',
-      color: 'text-orange-600 dark:text-orange-400',
-      bg: 'bg-orange-100 dark:bg-orange-900/30',
-      border: 'hover:border-orange-500 dark:hover:border-orange-500',
-      shadow: 'hover:shadow-orange-500/20',
-      gradient: 'from-orange-500 to-red-500'
-    },
+    // Marketplace temporarily hidden
+    // {
+    //   title: t('header.marketplace'),
+    //   desc: "Shop authentic tribal handicrafts.",
+    //   icon: ShoppingBag,
+    //   path: '/marketplace',
+    //   color: 'text-orange-600 dark:text-orange-400',
+    //   bg: 'bg-orange-100 dark:bg-orange-900/30',
+    //   border: 'hover:border-orange-500 dark:hover:border-orange-500',
+    //   shadow: 'hover:shadow-orange-500/20',
+    //   gradient: 'from-orange-500 to-red-500'
+    // },
     {
       title: t('header.chatbot'),
       desc: "Chat with our AI guide 24/7.",
@@ -81,7 +82,7 @@ export default function QuickSearchBar() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {actions.map((action, index) => (
             <div
               key={index}

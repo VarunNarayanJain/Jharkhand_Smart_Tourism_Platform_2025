@@ -7,7 +7,7 @@ import ItineraryPlanner from './pages/ItineraryPlanner';
 import DestinationExplorer from './pages/DestinationExplorer';
 import DestinationDetail from './pages/DestinationDetail';
 import Chatbot from './pages/Chatbot';
-import Marketplace from './pages/Marketplace';
+// import Marketplace from './pages/Marketplace'; // Temporarily hidden
 import Dashboard from './pages/Dashboard';
 import DatabaseTest from './pages/DatabaseTest';
 import { ItineraryProvider } from './context/ItineraryContext';
@@ -46,14 +46,15 @@ function App() {
                       </ProtectedRoute>
                     } 
                   />
-                  <Route 
+                  {/* Marketplace temporarily hidden - will be enabled later */}
+                  {/* <Route 
                     path="/marketplace" 
                     element={
                       <ProtectedRoute>
                         <Marketplace />
                       </ProtectedRoute>
                     } 
-                  />
+                  /> */}
                 </Routes>
               </main>
               <Footer />

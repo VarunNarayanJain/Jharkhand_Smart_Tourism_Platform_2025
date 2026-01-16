@@ -26,7 +26,7 @@ export default function Header() {
     { name: t('header.home'), path: '/' },
     { name: t('header.destinations'), path: '/destinations' },
     { name: t('header.itinerary'), path: '/itinerary' },
-    { name: t('header.marketplace'), path: '/marketplace' },
+    // { name: t('header.marketplace'), path: '/marketplace' }, // Temporarily hidden
     { name: t('header.chatbot'), path: '/chatbot' },
     { name: t('header.dashboard'), path: '/dashboard' },
   ];

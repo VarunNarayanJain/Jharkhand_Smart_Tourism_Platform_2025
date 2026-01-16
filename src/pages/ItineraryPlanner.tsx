@@ -4,6 +4,7 @@ import { MapPin, Clock, Users, Download, Sparkles, Plus, X, Save, History, Trash
 import { useItinerary } from '../context/ItineraryContext';
 import { useLanguage } from '../context/LanguageContext';
 import { API_ENDPOINTS } from '../config/api';
+import { generateItineraryPDF } from '../utils/pdfGenerator';
 
 export default function ItineraryPlanner() {
   const { t } = useLanguage();
@@ -103,6 +104,18 @@ export default function ItineraryPlanner() {
       
       if (data.success) {
         console.log('✅ Itinerary generated successfully:', data);
+        console.log('📄 Raw AI Response:', data.rawResponse);
+        console.log('📊 Structured Days:', data.itinerary?.structuredDays);
+        
+        // Log each day's activities in detail
+        data.itinerary?.structuredDays?.forEach((day: any, dayIndex: number) => {
+          console.log(`\n📅 Day ${day.day}: ${day.location}`);
+          day.activities?.forEach((act: any, actIndex: number) => {
+            console.log(`   ${act.time}: "${act.activity}" (${act.activity.length} chars)`);
+          });
+        });
+        
+        console.log('💰 Budget:', data.itinerary?.estimatedBudget);
         // Store the AI-generated itinerary
         setGeneratedItinerary(data.itinerary);
         
@@ -143,6 +156,36 @@ export default function ItineraryPlanner() {
     if (e.key === 'Enter') {
       e.preventDefault();
       addPlace();
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!generatedItinerary) {
+      alert('No itinerary available to download. Please generate an itinerary first.');
+      return;
+    }
+
+    try {
+      // Prepare the itinerary data for PDF
+      const pdfData = {
+        title: currentItinerary.title || 'Your Jharkhand Adventure',
+        startCity: formData.startCity,
+        duration: formData.duration,
+        dates: formData.dates,
+        groupType: formData.groupType,
+        interests: formData.interests,
+        budget: generatedItinerary.estimatedBudget,
+        structuredDays: generatedItinerary.structuredDays,
+        rawContent: generatedItinerary.rawContent
+      };
+
+      generateItineraryPDF(pdfData, formData);
+      
+      // Optional: Show success message
+      console.log('✅ PDF generated successfully');
+    } catch (error) {
+      console.error('❌ Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -508,7 +551,10 @@ export default function ItineraryPlanner() {
                       {formData.duration} days • {formData.startCity} • {formData.groupType}
                     </p>
                   </div>
-                  <button className="flex items-center space-x-2 px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95">
+                  <button 
+                    onClick={handleDownloadPDF}
+                    className="flex items-center space-x-2 px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95"
+                  >
                     <Download className="w-4 h-4" />
                     <span>{t('itinerary.downloadPDF')}</span>
                   </button>
@@ -517,23 +563,46 @@ export default function ItineraryPlanner() {
                 <div className="space-y-8 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
                   {generatedItinerary ? (
                     <>
-                      {/* AI Generated Content */}
-                      <div className="bg-blue-50 dark:bg-blue-900/10 rounded-2xl p-6 border border-blue-100 dark:border-blue-800/30">
-                        <h3 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-3 flex items-center space-x-2 uppercase tracking-wider">
-                          <Sparkles className="w-4 h-4" />
-                          <span>{t('itinerary.aiGenerated')}</span>
-                        </h3>
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
-                          <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-sans leading-relaxed">
-                            {generatedItinerary.rawContent}
-                          </pre>
+                      {/* Only show raw content if no structured days are available */}
+                      {(!generatedItinerary.structuredDays || generatedItinerary.structuredDays.length === 0) && (
+                        <div className="bg-blue-50 dark:bg-blue-900/10 rounded-2xl p-6 border border-blue-100 dark:border-blue-800/30">
+                          <h3 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-3 flex items-center space-x-2 uppercase tracking-wider">
+                            <Sparkles className="w-4 h-4" />
+                            <span>{t('itinerary.aiGenerated')}</span>
+                          </h3>
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-sans leading-relaxed">
+                              {generatedItinerary.rawContent}
+                            </pre>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      {/* Structured Days */}
+                      {/* Structured Days - Main Display */}
                       {generatedItinerary.structuredDays && generatedItinerary.structuredDays.length > 0 && (
-                        <div className="relative border-l-2 border-gray-200 dark:border-gray-800 ml-4 space-y-12">
-                          {generatedItinerary.structuredDays.map((day: any) => (
+                        <>
+                          {/* Budget Summary Card */}
+                          {generatedItinerary.estimatedBudget && (
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl p-6 border border-green-200 dark:border-green-800/30">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h3 className="text-sm font-bold text-green-800 dark:text-green-300 mb-1 uppercase tracking-wider">
+                                    Estimated Budget
+                                  </h3>
+                                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                                    {generatedItinerary.estimatedBudget}
+                                  </p>
+                                </div>
+                                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                                  <span className="text-3xl">💰</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Day-by-Day Timeline */}
+                          <div className="relative border-l-2 border-gray-200 dark:border-gray-800 ml-4 space-y-12">
+                            {generatedItinerary.structuredDays.map((day: any) => (
                             <div key={day.day} className="relative pl-8">
                               {/* Timeline Dot */}
                               <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-green-500 border-4 border-white dark:border-gray-900 shadow-sm"></div>
@@ -586,6 +655,7 @@ export default function ItineraryPlanner() {
                             </div>
                           ))}
                         </div>
+                        </>
                       )}
                     </>
                   ) : (

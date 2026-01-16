@@ -47,11 +47,12 @@ export default function Footer() {
                   {t('header.itinerary')}
                 </Link>
               </li>
-              <li>
+              {/* Marketplace temporarily hidden */}
+              {/* <li>
                 <Link to="/marketplace" className="text-gray-300 hover:text-green-400 transition-colors duration-200 text-sm">
                   {t('header.marketplace')}
                 </Link>
-              </li>
+              </li> */}
               <li>
                 <Link to="/chatbot" className="text-gray-300 hover:text-green-400 transition-colors duration-200 text-sm">
                   {t('header.chatbot')}

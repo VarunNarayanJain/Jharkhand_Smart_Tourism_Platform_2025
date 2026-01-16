@@ -1,34 +1,77 @@
 import { useState, useEffect } from 'react';
 import { 
-  BarChart3, MapPin, TrendingUp, CheckCircle, XCircle, User, Calendar, 
-  PhoneCall, AlertTriangle, Heart, Edit3, Navigation, Star, BadgeCheck,
-  Layout, Shield, MessageSquare, LogOut, Settings, Plus
+  MapPin, CheckCircle, User, Calendar, 
+  AlertTriangle, Edit3, Navigation,
+  Layout, Shield, MessageSquare, Settings, Plus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import GlobalAuthModal from '../components/GlobalAuthModal';
+import { itineraryService, eventsService, analyticsService } from '../lib/database';
+import type { Itinerary, CulturalEvent } from '../lib/supabase';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const [activeTab, setActiveTab] = useState('overview');
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   
-  // Rating state for reviews (must be declared before any returns)
-  type RatingState = {
-    [key: number]: { stars: number; honest: boolean; badge: boolean; comment: string };
-  };
-  const [ratings, setRatings] = useState<RatingState>({});
+  // Real data from database
+  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
+  const [culturalEvents, setCulturalEvents] = useState<CulturalEvent[]>([]);
+  const [platformStats, setPlatformStats] = useState({ 
+    totalDestinations: 0, 
+    totalGuides: 0, 
+    totalMarketplaceItems: 0, 
+    totalEvents: 0 
+  });
+  const [loading, setLoading] = useState(true);
 
   // Debug logging
   useEffect(() => {
-    console.log('📊 Dashboard - User state:', { user: !!user, loading, email: user?.email });
-  }, [user, loading]);
+    console.log('📊 Dashboard - User state:', { user: !!user, loading: authLoading, email: user?.email });
+  }, [user, authLoading]);
+
+  // Fetch user's data from database
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Fetch user's itineraries
+        const userItineraries = await itineraryService.getByUser(user.id);
+        setItineraries(userItineraries);
+
+        // Fetch upcoming cultural events
+        const upcomingEvents = await eventsService.getUpcoming();
+        setCulturalEvents(upcomingEvents.slice(0, 3)); // Get top 3
+
+        // Fetch platform stats
+        const stats = await analyticsService.getPlatformStats();
+        setPlatformStats(stats);
+
+        console.log('✅ Dashboard data loaded:', {
+          itineraries: userItineraries.length,
+          events: upcomingEvents.length,
+          stats
+        });
+      } catch (err) {
+        console.error('❌ Error fetching dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
 
   // Jharkhand Landscapes for Slideshow
   const backgroundImages = [
@@ -49,13 +92,13 @@ export default function Dashboard() {
 
   // Show auth modal if not logged in
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       setShowAuthModal(true);
     }
-  }, [user, loading]);
+  }, [user, authLoading]);
 
-  // Show loading state while checking authentication
-  if (loading) {
+  // Show loading state while checking authentication or fetching data
+  if (authLoading || loading) {
     return (
       <div className="pt-20 min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
         <div className="text-center">
@@ -101,65 +144,33 @@ export default function Dashboard() {
     );
   }
 
-  // Analytics data
-  const analyticsData = {
-    totalItineraries: 1247,
-    activeGuides: 68,
-    verifiedArtisans: 145,
-    satisfactionRate: 94
-  };
-
-  const topDestinations = [
-    { name: 'Netarhat', visits: 89, growth: 12, image: 'https://images.pexels.com/photos/13650368/pexels-photo-13650368.jpeg?auto=compress&cs=tinysrgb&w=800' },
-    { name: 'Hundru Falls', visits: 76, growth: 8, image: 'https://images.pexels.com/photos/11022645/pexels-photo-11022645.jpeg?auto=compress&cs=tinysrgb&w=800' },
-    { name: 'Betla National Park', visits: 67, growth: 15, image: 'https://images.pexels.com/photos/15784625/pexels-photo-15784625.jpeg?auto=compress&cs=tinysrgb&w=800' },
-  ];
-
-  type Rateable = {
-    id: number;
-    name: string;
-    category: 'Guide' | 'Homestay' | 'Artisan';
-    location: string;
-    image: string;
-  };
-
-  const rateables: Rateable[] = [
-    { id: 11, name: 'Priya Kumari', category: 'Guide', location: 'Gumla', image: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1' },
-    { id: 12, name: 'Forest Nest Homestay', category: 'Homestay', location: 'Netarhat', image: 'https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1' },
-    { id: 13, name: 'Santosh Mahato', category: 'Artisan', location: 'Saraikela', image: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1' },
-  ];
-
-  // Helper function for updating ratings
-  const updateRating = (id: number, partial: Partial<RatingState[number]>) => {
-    setRatings((prev) => {
-      const base = prev[id] || { stars: 0, honest: false, badge: false, comment: '' };
-      return {
-        ...prev,
-        [id]: { ...base, ...partial },
-      };
-    });
-  };
-
   const handleStartPlanning = () => {
     try { navigate('/itinerary'); } catch (e) { /* no-op */ }
   };
 
-  const savedItineraries = [
-    { id: 101, title: 'Weekend at Netarhat', days: 2, date: '2024-03-15', status: 'Upcoming' },
-    { id: 102, title: 'Wildlife at Betla', days: 3, date: '2023-12-10', status: 'Completed' },
-    { id: 103, title: 'Deoghar Pilgrimage', days: 1, date: '2023-11-05', status: 'Completed' },
-  ];
+  const getItineraryStatus = (itinerary: Itinerary) => {
+    if (!itinerary.start_date) return 'Draft';
+    const startDate = new Date(itinerary.start_date);
+    const today = new Date();
+    return startDate > today ? 'Upcoming' : 'Completed';
+  };
 
-  const culturalEvents = [
-    { id: 1, name: 'Sarhul Festival', date: 'Apr 14', location: 'Ranchi', type: 'Festival' },
-    { id: 2, name: 'Karma Puja', date: 'Aug 28', location: 'Hazaribagh', type: 'Ritual' },
-    { id: 3, name: 'Dokra Craft Fair', date: 'Dec 10', location: 'Saraikela', type: 'Exhibition' },
-  ];
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Date TBD';
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const formatEventDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return {
+      month: date.toLocaleDateString('en-US', { month: 'short' }),
+      day: date.getDate().toString()
+    };
+  };
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Layout },
     { id: 'trips', label: 'My Trips', icon: MapPin },
-    { id: 'reviews', label: 'Reviews & Community', icon: MessageSquare },
     { id: 'safety', label: 'Safety Center', icon: Shield },
   ];
 
@@ -171,9 +182,9 @@ export default function Dashboard() {
     email: user?.email || '',
     phone: user?.phone || '+91 XXXXX XXXXX',
     preferences: ['Nature', 'Culture', 'Local Food'],
-    memberSince: 'Jan 2024',
-    tripsPlanned: 12,
-    reviewsGiven: 8
+    memberSince: user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Recently',
+    tripsPlanned: itineraries.length,
+    reviewsGiven: 0 // Will implement review system later
   };
 
   console.log('📊 Dashboard rendering with user:', safeUserProfile.name);
@@ -268,12 +279,11 @@ export default function Dashboard() {
           {activeTab === 'overview' && (
             <div className="space-y-8">
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
                   { label: 'Trips Planned', value: safeUserProfile.tripsPlanned, icon: Navigation, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-                  { label: 'Reviews Given', value: safeUserProfile.reviewsGiven, icon: Star, color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
-                  { label: 'Saved Places', value: '24', icon: Heart, color: 'text-pink-600', bg: 'bg-pink-100 dark:bg-pink-900/30' },
-                  { label: 'Community Rank', value: 'Explorer', icon: BadgeCheck, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30' },
+                  { label: 'Destinations', value: platformStats.totalDestinations, icon: MapPin, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/30' },
+                  { label: 'Active Guides', value: platformStats.totalGuides, icon: User, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30' },
                 ].map((stat, idx) => (
                   <div key={idx} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
                     <div className="flex justify-between items-start mb-4">
@@ -290,96 +300,122 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Content - 2 Cols */}
                 <div className="lg:col-span-2 space-y-8">
-                  {/* Active Trip Card */}
-                  <div className="bg-gradient-to-br from-green-600 to-emerald-800 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-6">
-                        <div>
-                          <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-medium border border-white/20">Upcoming Trip</span>
-                          <h3 className="text-3xl font-bold mt-3">Weekend at Netarhat</h3>
-                          <p className="text-green-100 mt-1">Starts in 2 days • 2 Travelers</p>
-                        </div>
-                        <div className="bg-white/20 backdrop-blur-md p-3 rounded-2xl border border-white/20">
-                          <Calendar className="w-8 h-8" />
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4 mt-8">
-                        <button className="bg-white text-green-800 px-6 py-3 rounded-xl font-bold hover:bg-green-50 transition-colors shadow-lg">
-                          View Itinerary
-                        </button>
-                        <button className="bg-green-700/50 hover:bg-green-700/70 text-white px-6 py-3 rounded-xl font-medium backdrop-blur-md transition-colors border border-white/10">
-                          Edit Details
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Top Destinations */}
-                  <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 border border-gray-100 dark:border-gray-800 shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-green-600" />
-                        Trending Destinations
-                      </h3>
-                      <button className="text-green-600 font-medium hover:underline">View All</button>
-                    </div>
-                    <div className="space-y-4">
-                      {topDestinations.map((dest, idx) => (
-                        <div key={idx} className="group flex items-center space-x-4 p-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all cursor-pointer">
-                          <div className="w-20 h-20 rounded-xl overflow-hidden">
-                            <img src={dest.image} alt={dest.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-bold text-gray-900 dark:text-white text-lg">{dest.name}</h4>
-                            <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                              <span className="flex items-center"><User className="w-3 h-3 mr-1" /> {dest.visits}k visits</span>
-                              <span className="text-green-600 font-medium">+{dest.growth}% this week</span>
+                  {/* Active Trip Card or Empty State */}
+                  {itineraries.length > 0 ? (
+                    (() => {
+                      const upcomingTrip = itineraries.find(it => getItineraryStatus(it) === 'Upcoming') || itineraries[0];
+                      const status = getItineraryStatus(upcomingTrip);
+                      return (
+                        <div className="bg-gradient-to-br from-green-600 to-emerald-800 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
+                          <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-6">
+                              <div>
+                                <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-medium border border-white/20">
+                                  {status} Trip
+                                </span>
+                                <h3 className="text-3xl font-bold mt-3">{upcomingTrip.title}</h3>
+                                <p className="text-green-100 mt-1">
+                                  {formatDate(upcomingTrip.start_date)} • {upcomingTrip.days} Day{upcomingTrip.days !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                              <div className="bg-white/20 backdrop-blur-md p-3 rounded-2xl border border-white/20">
+                                <Calendar className="w-8 h-8" />
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4 mt-8">
+                              <button 
+                                onClick={() => navigate('/itinerary')}
+                                className="bg-white text-green-800 px-6 py-3 rounded-xl font-bold hover:bg-green-50 transition-colors shadow-lg"
+                              >
+                                View Itinerary
+                              </button>
+                              <button 
+                                onClick={() => navigate('/itinerary')}
+                                className="bg-green-700/50 hover:bg-green-700/70 text-white px-6 py-3 rounded-xl font-medium backdrop-blur-md transition-colors border border-white/10"
+                              >
+                                Edit Details
+                              </button>
                             </div>
                           </div>
-                          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/30 group-hover:text-green-600 transition-colors">
-                            <Navigation className="w-5 h-5" />
-                          </div>
                         </div>
-                      ))}
+                      );
+                    })()
+                  ) : (
+                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-3xl p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 text-center">
+                      <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-300 mb-2">No Trips Planned Yet</h3>
+                      <p className="text-gray-500 dark:text-gray-400 mb-6">Start planning your perfect Jharkhand adventure!</p>
+                      <button 
+                        onClick={handleStartPlanning}
+                        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all shadow-lg"
+                      >
+                        Plan Your First Trip
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Quick Actions */}
+                  <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 border border-gray-100 dark:border-gray-800 shadow-sm">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Quick Actions</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button 
+                        onClick={() => navigate('/destinations')}
+                        className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-2xl hover:shadow-lg transition-all group"
+                      >
+                        <MapPin className="w-8 h-8 text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
+                        <h4 className="font-bold text-gray-900 dark:text-white">Explore</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Destinations</p>
+                      </button>
+                      <button 
+                        onClick={() => navigate('/chatbot')}
+                        className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-2xl hover:shadow-lg transition-all group"
+                      >
+                        <MessageSquare className="w-8 h-8 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
+                        <h4 className="font-bold text-gray-900 dark:text-white">Ask AI</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Travel Help</p>
+                      </button>
                     </div>
                   </div>
                 </div>
 
                 {/* Sidebar - 1 Col */}
                 <div className="space-y-8">
-                  {/* Community Pulse */}
+                  {/* Platform Stats */}
                   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Community Pulse</h3>
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Platform Overview</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg">
+                            <MapPin className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Destinations</p>
+                            <p className="font-bold text-gray-900 dark:text-white">{platformStats.totalDestinations}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
                         <div className="flex items-center space-x-3">
                           <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-lg">
                             <User className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Active Guides</p>
-                            <p className="font-bold text-gray-900 dark:text-white">{analyticsData.activeGuides}</p>
-                          </div>
-                        </div>
-                        <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-700"></div>
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg">
-                            <BadgeCheck className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Artisans</p>
-                            <p className="font-bold text-gray-900 dark:text-white">{analyticsData.verifiedArtisans}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Active Guides</p>
+                            <p className="font-bold text-gray-900 dark:text-white">{platformStats.totalGuides}</p>
                           </div>
                         </div>
                       </div>
-                      <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Platform Satisfaction</span>
-                          <span className="text-green-600 font-bold">{analyticsData.satisfactionRate}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div className="bg-green-600 h-2 rounded-full" style={{ width: `${analyticsData.satisfactionRate}%` }}></div>
+                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg">
+                            <Calendar className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Cultural Events</p>
+                            <p className="font-bold text-gray-900 dark:text-white">{platformStats.totalEvents}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -387,24 +423,39 @@ export default function Dashboard() {
 
                   {/* Upcoming Events */}
                   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Cultural Calendar</h3>
-                    <div className="space-y-4">
-                      {culturalEvents.map((ev) => (
-                        <div key={ev.id} className="flex items-start space-x-4 pb-4 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
-                          <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-2 rounded-xl text-center min-w-[60px]">
-                            <span className="block text-xs font-bold uppercase">{ev.date.split(' ')[0]}</span>
-                            <span className="block text-lg font-bold">{ev.date.split(' ')[1]}</span>
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-900 dark:text-white text-sm">{ev.name}</h4>
-                            <p className="text-xs text-gray-500 mt-1">{ev.location} • {ev.type}</p>
-                          </div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Upcoming Cultural Events</h3>
+                    {culturalEvents.length > 0 ? (
+                      <>
+                        <div className="space-y-4">
+                          {culturalEvents.map((ev) => {
+                            const eventDate = formatEventDate(ev.date);
+                            return (
+                              <div key={ev.id} className="flex items-start space-x-4 pb-4 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
+                                <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-2 rounded-xl text-center min-w-[60px]">
+                                  <span className="block text-xs font-bold uppercase">{eventDate.month}</span>
+                                  <span className="block text-lg font-bold">{eventDate.day}</span>
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-gray-900 dark:text-white text-sm">{ev.name}</h4>
+                                  <p className="text-xs text-gray-500 mt-1">{ev.location}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
-                    <button className="w-full mt-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors">
-                      View Full Calendar
-                    </button>
+                        <button 
+                          onClick={() => navigate('/destinations')}
+                          className="w-full mt-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                        >
+                          View All Events
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Calendar className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming events at the moment</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -413,106 +464,84 @@ export default function Dashboard() {
 
           {activeTab === 'trips' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {savedItineraries.map((it) => (
-                <div key={it.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-all group">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      it.status === 'Upcoming' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {it.status}
+              {itineraries.length > 0 ? (
+                <>
+                  {itineraries.map((it) => {
+                    const status = getItineraryStatus(it);
+                    return (
+                      <div key={it.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-lg transition-all group">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            status === 'Upcoming' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 
+                            status === 'Completed' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' : 
+                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            {status}
+                          </div>
+                          <button 
+                            onClick={() => navigate('/itinerary')}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{it.title}</h3>
+                        <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400 mb-6">
+                          <div className="flex items-center">
+                            <Calendar className="w-4 h-4 mr-2" /> 
+                            {formatDate(it.start_date)}
+                          </div>
+                          <div className="flex items-center">
+                            <Navigation className="w-4 h-4 mr-2" /> 
+                            {it.days} Day{it.days !== 1 ? 's' : ''} Trip
+                          </div>
+                          {it.destinations && it.destinations.length > 0 && (
+                            <div className="flex items-center">
+                              <MapPin className="w-4 h-4 mr-2" /> 
+                              {it.destinations.slice(0, 2).join(', ')}
+                              {it.destinations.length > 2 && ` +${it.destinations.length - 2}`}
+                            </div>
+                          )}
+                        </div>
+                        <button 
+                          onClick={() => navigate('/itinerary')}
+                          className="w-full py-3 rounded-xl border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Add New Trip Card */}
+                  <button 
+                    onClick={handleStartPlanning}
+                    className="bg-gray-50 dark:bg-gray-800/50 rounded-3xl p-6 border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-gray-400 hover:text-green-600 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/10 transition-all min-h-[250px]"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center mb-4 shadow-sm">
+                      <Plus className="w-8 h-8" />
                     </div>
-                    <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                      <Edit3 className="w-4 h-4" />
+                    <span className="font-bold text-lg">Plan New Trip</span>
+                  </button>
+                </>
+              ) : (
+                <div className="col-span-3">
+                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-3xl p-12 border-2 border-dashed border-gray-200 dark:border-gray-700 text-center">
+                    <MapPin className="w-20 h-20 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-300 mb-2">No Trips Yet</h3>
+                    <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                      Start planning your first Jharkhand adventure! Our AI-powered itinerary planner will help you create the perfect trip.
+                    </p>
+                    <button 
+                      onClick={handleStartPlanning}
+                      className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all shadow-lg inline-flex items-center gap-2"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Create Your First Itinerary
                     </button>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{it.title}</h3>
-                  <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400 mb-6">
-                    <div className="flex items-center"><Calendar className="w-4 h-4 mr-2" /> {it.date}</div>
-                    <div className="flex items-center"><Navigation className="w-4 h-4 mr-2" /> {it.days} Days Trip</div>
-                  </div>
-                  <button className="w-full py-3 rounded-xl border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    View Details
-                  </button>
                 </div>
-              ))}
-              
-              {/* Add New Trip Card */}
-              <button 
-                onClick={handleStartPlanning}
-                className="bg-gray-50 dark:bg-gray-800/50 rounded-3xl p-6 border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-gray-400 hover:text-green-600 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/10 transition-all min-h-[250px]"
-              >
-                <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center mb-4 shadow-sm">
-                  <Plus className="w-8 h-8" />
-                </div>
-                <span className="font-bold text-lg">Plan New Trip</span>
-              </button>
-            </div>
-          )}
-
-          {activeTab === 'reviews' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {rateables.map((item) => {
-                const r = ratings[item.id] || { stars: 0, honest: false, badge: false, comment: '' };
-                return (
-                  <div key={item.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-                    <div className="flex items-start space-x-4 mb-6">
-                      <div className="w-20 h-20 rounded-2xl overflow-hidden">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{item.name}</h3>
-                        <span className="inline-block px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 mt-1">
-                          {item.category}
-                        </span>
-                        <div className="flex items-center text-sm text-gray-500 mt-2">
-                          <MapPin className="w-3 h-3 mr-1" /> {item.location}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex justify-center space-x-2">
-                        {[1,2,3,4,5].map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => updateRating(item.id, { stars: s })}
-                            className={`p-2 transition-transform hover:scale-110 ${s <= r.stars ? 'text-yellow-400' : 'text-gray-200 dark:text-gray-700'}`}
-                          >
-                            <Star className="w-8 h-8 fill-current" />
-                          </button>
-                        ))}
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <button
-                          className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${r.honest ? 'bg-green-100 text-green-700' : 'bg-gray-50 dark:bg-gray-800 text-gray-600'}`}
-                          onClick={() => updateRating(item.id, { honest: !r.honest })}
-                        >
-                          {r.honest ? 'Marked Honest' : 'Mark Honest'}
-                        </button>
-                        <button
-                          className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${r.badge ? 'bg-amber-100 text-amber-700' : 'bg-gray-50 dark:bg-gray-800 text-gray-600'}`}
-                          onClick={() => updateRating(item.id, { badge: !r.badge })}
-                        >
-                          {r.badge ? 'Badge Given' : 'Give Badge'}
-                        </button>
-                      </div>
-
-                      <textarea
-                        value={r.comment}
-                        onChange={(e) => updateRating(item.id, { comment: e.target.value })}
-                        placeholder="Share your experience..."
-                        className="w-full bg-gray-50 dark:bg-gray-800 border-0 rounded-xl p-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
-                        rows={3}
-                      />
-
-                      <button className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-xl font-bold hover:shadow-lg transition-all">
-                        Submit Review
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              )}
             </div>
           )}
 
